@@ -1,0 +1,512 @@
+/* ========================================
+   HORROR SYSTEM - ESTILOS MEJORADOS
+   ======================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow: hidden;
+  background: transparent;
+  transition: filter 0.3s ease;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  pointer-events: none;
+}
+
+/* ========================================
+   NOTIFICACIONES MEJORADAS
+   ======================================== */
+#notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.notification {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: rgba(15, 15, 15, 0.95);
+  border-left: 4px solid #8b0000;
+  padding: 16px 20px;
+  border-radius: 10px;
+  color: #fff;
+  /* box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8); */
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateX(400px);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.notification-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification.leaving {
+  border-left-color: #00aa00;
+}
+
+.notification.intensity-high {
+  border-left-color: #ff0000;
+}
+
+.notification.intensity-medium {
+  border-left-color: #ff8800;
+}
+
+.notification-title {
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #ff4444;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notification.leaving .notification-title {
+  color: #44ff44;
+}
+
+.notification-message {
+  font-size: 13px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+/* ========================================
+   OVERLAY DE CEGUERA
+   ======================================== */
+#blindness-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.95) 100%);
+  z-index: 9999;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+  opacity: 0;
+}
+
+#blindness-overlay.active {
+  opacity: 1;
+}
+
+/* ========================================
+   JUMPSCARE MEJORADO
+   ======================================== */
+#jumpscare-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#jumpscare-overlay.hidden {
+  display: none;
+}
+
+#jumpscare-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  animation: jumpscareZoom 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+#jumpscare-glitch {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 0, 0, 0.15) 0px,
+    transparent 2px,
+    transparent 4px,
+    rgba(0, 255, 0, 0.15) 4px,
+    transparent 6px
+  );
+  animation: glitchAnimation 0.08s infinite;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+@keyframes jumpscareZoom {
+  0% { transform: scale(0.3) rotate(-5deg); opacity: 0; filter: blur(20px); }
+  50% { transform: scale(1.1) rotate(2deg); filter: blur(5px); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; filter: blur(0); }
+}
+
+@keyframes glitchAnimation {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-8px); }
+  80% { transform: translateX(8px); }
+  100% { transform: translateX(0); }
+}
+
+/* ========================================
+   EFECTOS VISUALES
+   ======================================== */
+#visual-effects {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 100;
+}
+
+#static-effect {
+  width: 100%;
+  height: 100%;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" /></filter><rect width="200" height="200" filter="url(%23noise)" opacity="0.4"/></svg>');
+  animation: staticNoise 0.08s infinite;
+  opacity: 0.6;
+  mix-blend-mode: overlay;
+}
+
+#static-effect.hidden {
+  display: none;
+}
+
+@keyframes staticNoise {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -5%); }
+  20% { transform: translate(-10%, 5%); }
+  30% { transform: translate(5%, -10%); }
+  40% { transform: translate(-5%, 15%); }
+  50% { transform: translate(-10%, 5%); }
+  60% { transform: translate(15%, 0); }
+  70% { transform: translate(0, 10%); }
+  80% { transform: translate(-15%, 0); }
+  90% { transform: translate(10%, 5%); }
+  100% { transform: translate(5%, 0); }
+}
+
+#vignette-effect {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.9) 100%);
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+#vignette-effect.active {
+  opacity: 1;
+}
+
+#vignette-effect[data-intensity="high"] {
+  background: radial-gradient(circle, transparent 20%, rgba(0, 0, 0, 0.95) 100%);
+}
+
+#vignette-effect[data-intensity="medium"] {
+  background: radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.85) 100%);
+}
+
+#chromatic-effect {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.15) 0%,
+    transparent 50%,
+    rgba(0, 0, 255, 0.15) 100%
+  );
+  animation: chromaticShift 2s infinite;
+  mix-blend-mode: screen;
+}
+
+#chromatic-effect.hidden {
+  display: none;
+}
+
+@keyframes chromaticShift {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
+}
+
+/* ========================================
+   APARICIÓN FANTASMAL
+   ======================================== */
+#ghost-container {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+}
+
+#ghost-container.hidden {
+  display: none;
+}
+
+.ghost-figure {
+  width: 220px;
+  height: 320px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 50% 50% 0 0;
+  animation: ghostFloat 3s ease-in-out infinite, ghostFade 10s ease-out;
+  filter: blur(1px) brightness(1.3);
+  position: relative;
+  box-shadow: 0 0 80px rgba(200, 200, 255, 0.6);
+}
+
+.ghost-figure::before {
+  content: "";
+  position: absolute;
+  top: 28%;
+  left: 28%;
+  width: 24px;
+  height: 35px;
+  background: #000;
+  border-radius: 50%;
+  box-shadow: 55px 0 0 #000;
+  animation: ghostBlink 4s infinite;
+}
+
+@keyframes ghostFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-25px) scale(1.02); }
+}
+
+@keyframes ghostFade {
+  0% { opacity: 0; filter: blur(5px); }
+  15% { opacity: 1; filter: blur(1px); }
+  85% { opacity: 1; filter: blur(1px); }
+  100% { opacity: 0; filter: blur(5px); }
+}
+
+@keyframes ghostBlink {
+  0%, 45%, 55%, 100% { height: 35px; }
+  48%, 52% { height: 3px; }
+}
+
+/* ========================================
+   INDICADOR DE ZONA
+   ======================================== */
+#zone-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 200;
+  animation: zoneAppear 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transition: opacity 0.5s;
+}
+
+#zone-indicator.hidden {
+  display: none;
+}
+
+.zone-icon {
+  font-size: 90px;
+  margin-bottom: 25px;
+  animation: pulse 2s infinite, iconRotate 4s infinite;
+  filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.8));
+}
+
+.zone-name {
+  font-size: 38px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 
+    0 0 20px rgba(255, 0, 0, 0.9),
+    0 0 40px rgba(255, 0, 0, 0.6),
+    0 0 60px rgba(255, 0, 0, 0.4);
+  margin-bottom: 15px;
+  letter-spacing: 2px;
+}
+
+.zone-intensity {
+  font-size: 18px;
+  color: #ff6666;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  font-weight: 600;
+}
+
+@keyframes zoneAppear {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); }
+  60% { transform: translate(-50%, -50%) scale(1.1) rotate(5deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+@keyframes iconRotate {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+/* ========================================
+   MEDIDOR DE SANIDAD
+   ======================================== */
+#sanity-meter {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: rgba(10, 10, 10, 0.9);
+  padding: 12px 20px;
+  border-radius: 50px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  z-index: 150;
+  transition: all 0.3s ease;
+}
+
+#sanity-meter.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(100px);
+  pointer-events: none;
+}
+
+#sanity-meter.critical {
+  animation: sanityWarning 1s infinite;
+}
+
+.sanity-icon {
+  font-size: 24px;
+}
+
+.sanity-bar {
+  width: 200px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sanity-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #44ff44);
+  transition: width 0.5s ease, background 0.3s ease;
+  border-radius: 10px;
+}
+
+.sanity-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  min-width: 50px;
+  text-align: right;
+}
+
+@keyframes sanityWarning {
+  0%, 100% { border-color: rgba(255, 0, 0, 0.3); }
+  50% { border-color: rgba(255, 0, 0, 1); }
+}
+
+/* ========================================
+   EFECTOS DE INTENSIDAD
+   ======================================== */
+.intensity-low {
+  filter: brightness(0.92) saturate(0.95);
+}
+
+.intensity-medium {
+  filter: brightness(0.75) saturate(0.8) contrast(1.1);
+}
+
+.intensity-high {
+  filter: brightness(0.55) saturate(0.65) contrast(1.3);
+}
+
+/* ========================================
+   ANIMACIONES ADICIONALES
+   ======================================== */
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 1280px) {
+  .notification {
+    max-width: 350px;
+    padding: 14px 18px;
+  }
+  
+  .zone-name {
+    font-size: 32px;
+  }
+  
+  #sanity-meter {
+    bottom: 20px;
+  }
+  
+  .sanity-bar {
+    width: 150px;
+  }
+}
+
+@media (max-width: 768px) {
+  #notification-container {
+    right: 10px;
+    top: 10px;
+    max-width: 300px;
+  }
+  
+  .notification {
+    padding: 12px 15px;
+    font-size: 12px;
+  }
+  
+  .zone-name {
+    font-size: 24px;
+  }
+  
+  .zone-icon {
+    font-size: 60px;
+  }
+}

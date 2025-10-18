@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horror System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="notification-container"></div>
+        
+        <div id="jumpscare-overlay" class="hidden">
+            <img id="jumpscare-image" src="/placeholder.svg" alt="jumpscare">
+            <div id="jumpscare-glitch"></div>
+        </div>
+        
+        <div id="visual-effects">
+            <div id="static-effect" class="hidden"></div>
+            <div id="vignette-effect"></div>
+            <div id="chromatic-effect" class="hidden"></div>
+        </div>
+        
+        <div id="ghost-container" class="hidden">
+            <div class="ghost-figure"></div>
+        </div>
+        
+        <div id="zone-indicator" class="hidden">
+            <div class="zone-icon">☠️</div>
+            <div class="zone-name"></div>
+            <div class="zone-intensity"></div>
+        </div>
+        
+        <div id="blindness-overlay" class="hidden"></div>
+
+        <audio id="horror-audio" preload="auto"></audio>
+    </div>
+    
+    <script src="sounds.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
