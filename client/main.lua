@@ -241,7 +241,6 @@ CreateThread(function()
                 end
             end
 
-            -- OBJETOS PARANORMALES
             if Config.Events.paranormalObjects.enabled and timeInZone >= Config.Events.paranormalObjects.minTimeInZone then
                 if currentTime - cooldowns.paranormal > Config.Events.paranormalObjects.cooldown then
                     local chance = GetModifiedChance(Config.Events.paranormalObjects.baseChance)
