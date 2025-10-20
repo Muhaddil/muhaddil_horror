@@ -1,3 +1,4 @@
+let DEBUG_MODE_SOUNDS = false;
 
 // URLs sonidos - Estas son gratuitas
 const SOUND_URLS = {
@@ -70,7 +71,7 @@ class AudioManager {
         this.sounds[name] = audio;
         this.preloadedSounds.add(name);
 
-        if (window.DEBUG_MODE) {
+        if (DEBUG_MODE_SOUNDS) {
           console.log(`✅ Sonido precargado: ${name}`);
         }
       } catch (error) {
@@ -101,7 +102,7 @@ class AudioManager {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            if (window.DEBUG_MODE) {
+            if (DEBUG_MODE_SOUNDS) {
               console.log(`🔊 Reproduciendo: ${name}`);
             }
           })
@@ -216,7 +217,7 @@ class AudioManager {
 
 window.AudioManager = AudioManager;
 
-if (window.DEBUG_MODE) {
+if (DEBUG_MODE_SOUNDS) {
   console.log("🎵 Audio Manager inicializado");
   console.log(`📊 Sonidos disponibles: ${Object.keys(SOUND_URLS).length}`);
   console.log("🔊 Lista de sonidos:", Object.keys(SOUND_URLS));

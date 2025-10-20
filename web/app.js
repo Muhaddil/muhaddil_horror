@@ -1,3 +1,5 @@
+let DEBUG_MODE = false;
+
 class HorrorSystem {
   constructor() {
     this.inZone = false;
@@ -165,7 +167,7 @@ class HorrorSystem {
       console.error("Error cargando jumpscares:", err);
     }
   }
-  
+
   playWhisper(sound) {
     const whisperSounds = ["whisper1", "whisper2"];
     const randomWhisper = whisperSounds[Math.floor(Math.random() * whisperSounds.length)];
@@ -622,3 +624,43 @@ styleSheet.textContent = `
   }
 `;
 document.head.appendChild(styleSheet);
+
+async function testAllJumpscareImages() {
+  try {
+    const res = await fetch("list.json");
+    const images = await res.json();
+
+    const overlay = document.getElementById("jumpscare-overlay");
+    const imageElement = document.getElementById("jumpscare-image");
+
+    console.log(`Probando ${images.length} imágenes...`);
+
+    for (let i = 0; i < images.length; i++) {
+      const src = images[i];
+      console.log(`Cargando imagen ${i + 1}: ${src}`);
+
+      await new Promise((resolve) => {
+        imageElement.onload = () => resolve();
+        imageElement.onerror = () => {
+          console.error(`Error cargando imagen: ${src}`);
+          resolve();
+        };
+        imageElement.src = src;
+        overlay.classList.remove("hidden");
+      });
+
+      await new Promise((r) => setTimeout(r, 1000));
+
+      overlay.classList.add("hidden");
+    }
+
+    console.log("Test de todas las imágenes completado.");
+
+  } catch (err) {
+    console.error("Error cargando list.json:", err);
+  }
+}
+
+if (DEBUG_MODE) {
+  testAllJumpscareImages();
+}

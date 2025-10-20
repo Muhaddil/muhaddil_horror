@@ -4,6 +4,8 @@ local timeInZone = 0
 local zones = {}
 local isImmuneToHorror = false
 local globalEvent = false
+local isGhostActive = false
+local currentGhostData = {}
 
 local cooldowns = {
     jumpscare = 0,
@@ -390,12 +392,18 @@ end)
 
 RegisterNetEvent('horror:ghostAppearance')
 AddEventHandler('horror:ghostAppearance', function()
+    if isGhostActive then
+        return
+    end
+
     if #activeEntities.ghosts >= Config.Performance.maxActiveGhosts then
         return
     end
 
     local playerPed = PlayerPedId()
     if IsPedInAnyVehicle(playerPed, false) then return end
+
+    isGhostActive = true
 
     local playerCoords = GetEntityCoords(playerPed)
     local playerHeading = GetEntityHeading(playerPed)
@@ -409,7 +417,10 @@ AddEventHandler('horror:ghostAppearance', function()
         timeout = timeout + 1
     end
 
-    if not HasModelLoaded(ghostModel) then return end
+    if not HasModelLoaded(ghostModel) then 
+        isGhostActive = false
+        return 
+    end
 
     local distance = math.random(10, 15)
     local angle = math.rad(playerHeading + math.random(-45, 45))
@@ -421,16 +432,30 @@ AddEventHandler('horror:ghostAppearance', function()
 
     if not DoesEntityExist(ghostPed) then
         SetModelAsNoLongerNeeded(ghostModel)
+        isGhostActive = false
         return
     end
+
+    currentGhostData = {
+        ped = ghostPed,
+        startTime = GetGameTimer(),
+        isBeingRemoved = false
+    }
 
     table.insert(activeEntities.ghosts, ghostPed)
 
     SetEntityAsMissionEntity(ghostPed, true, true)
     SetEntityInvincible(ghostPed, true)
-    SetEntityCollision(ghostPed, true, true)
+    SetEntityCollision(ghostPed, false, false)
     FreezeEntityPosition(ghostPed, false)
     SetBlockingOfNonTemporaryEvents(ghostPed, true)
+    SetEntityCanBeDamaged(ghostPed, false)
+    SetPedCanRagdoll(ghostPed, false)
+    SetPedCanBeTargetted(ghostPed, false)
+    SetPedCanBeDraggedOut(ghostPed, false)
+    SetPedConfigFlag(ghostPed, 17, true)
+    SetPedConfigFlag(ghostPed, 32, false)
+    SetEntityProofs(ghostPed, true, true, true, true, true, true, true, true)
 
     Wait(500)
 
@@ -457,11 +482,15 @@ AddEventHandler('horror:ghostAppearance', function()
     SetPedCombatMovement(ghostPed, 2)
 
     RequestAnimDict("melee@knife@streamed_core")
-    while not HasAnimDictLoaded("melee@knife@streamed_core") do
+    local animTimeout = 0
+    while not HasAnimDictLoaded("melee@knife@streamed_core") and animTimeout < 50 do
         Wait(50)
+        animTimeout = animTimeout + 1
     end
-    TaskPlayAnim(ghostPed, "melee@knife@streamed_core", "ground_attack_on_spot", 8.0, -8.0, -1, 49, 0, false, false,
-        false)
+
+    if HasAnimDictLoaded("melee@knife@streamed_core") then
+        TaskPlayAnim(ghostPed, "melee@knife@streamed_core", "ground_attack_on_spot", 8.0, -8.0, -1, 49, 0, false, false, false)
+    end
 
     PlaySoundFrontend(-1, "TIMER_STOP", "HUD_MINI_GAME_SOUNDSET", true)
 
@@ -477,21 +506,50 @@ AddEventHandler('horror:ghostAppearance', function()
 
     CreateThread(function()
         local startTime = GetGameTimer()
+        local lastValidCheck = startTime
+        local stuckCheckTimer = startTime
+        local lastGhostPos = GetEntityCoords(ghostPed)
 
-        while DoesEntityExist(ghostPed) do
+        while DoesEntityExist(ghostPed) and not currentGhostData.isBeingRemoved do
             Wait(200)
+
+            if not DoesEntityExist(ghostPed) or IsPedDeadOrDying(ghostPed, true) then
+                RemoveGhost(ghostPed)
+                break
+            end
 
             local ghostPos = GetEntityCoords(ghostPed)
             local playerPos = GetEntityCoords(PlayerPedId())
             local dist = #(ghostPos - playerPos)
             local elapsed = GetGameTimer() - startTime
 
+            if GetGameTimer() - stuckCheckTimer > 3000 then
+                local movementDist = #(ghostPos - lastGhostPos)
+                if movementDist < 1.0 and dist > 5.0 then
+                    ClearPedTasksImmediately(ghostPed)
+                    TaskGoToEntity(ghostPed, PlayerPedId(), -1, 0.0, Config.Events.ghostAppearance.chaseSpeed, 0, 0)
+                end
+                lastGhostPos = ghostPos
+                stuckCheckTimer = GetGameTimer()
+            end
+
+            if GetGameTimer() - lastValidCheck > 5000 then
+                if DoesEntityExist(ghostPed) and dist > 2.0 then
+                    ClearPedTasksImmediately(ghostPed)
+                    TaskGoToEntity(ghostPed, PlayerPedId(), -1, 0.0, Config.Events.ghostAppearance.chaseSpeed, 0, 0)
+                end
+                lastValidCheck = GetGameTimer()
+            end
+
             if dist <= 2.0 then
                 DoScreenFadeOut(800)
                 TriggerEvent('horror:jumpscare')
                 Wait(1500)
 
-                SetPedToRagdoll(PlayerPedId(), 3000, 3000, 0, false, false, false)
+                if DoesEntityExist(PlayerPedId()) then
+                    SetPedToRagdoll(PlayerPedId(), 3000, 3000, 0, false, false, false)
+                end
+                
                 RemoveGhost(ghostPed)
                 Wait(3000)
                 DoScreenFadeIn(2000)
@@ -502,6 +560,15 @@ AddEventHandler('horror:ghostAppearance', function()
                 RemoveGhost(ghostPed)
                 break
             end
+
+            if elapsed > (Config.Events.ghostAppearance.duration + 10000) then
+                RemoveGhost(ghostPed)
+                break
+            end
+        end
+
+        if DoesEntityExist(ghostPed) then
+            RemoveGhost(ghostPed)
         end
     end)
 
@@ -509,14 +576,44 @@ AddEventHandler('horror:ghostAppearance', function()
 end)
 
 function RemoveGhost(ghost)
-    if DoesEntityExist(ghost) then
-        for i = 200, 0, -20 do
-            if DoesEntityExist(ghost) then
-                SetEntityAlpha(ghost, i, false)
-            end
-            Wait(50)
+    if currentGhostData.isBeingRemoved then
+        return
+    end
+
+    if not DoesEntityExist(ghost) then
+        isGhostActive = false
+        currentGhostData = {}
+        return
+    end
+
+    currentGhostData.isBeingRemoved = true
+
+    ClearPedTasksImmediately(ghost)
+    FreezeEntityPosition(ghost, true)
+
+    for i = 200, 0, -20 do
+        if DoesEntityExist(ghost) then
+            SetEntityAlpha(ghost, i, false)
         end
+        Wait(50)
+    end
+
+    local deleteAttempts = 0
+    while DoesEntityExist(ghost) and deleteAttempts < 5 do
+        SetEntityAsMissionEntity(ghost, false, true)
         DeleteEntity(ghost)
+        
+        if DoesEntityExist(ghost) then
+            DeletePed(ghost)
+        end
+        
+        deleteAttempts = deleteAttempts + 1
+        Wait(100)
+    end
+
+    if DoesEntityExist(ghost) then
+        SetEntityAsNoLongerNeeded(ghost)
+        SetPedAsNoLongerNeeded(ghost)
     end
 
     for i, g in ipairs(activeEntities.ghosts) do
@@ -525,7 +622,43 @@ function RemoveGhost(ghost)
             break
         end
     end
+
+    -- Resetear flags globales
+    isGhostActive = false
+    currentGhostData = {}
 end
+
+CreateThread(function()
+    while true do
+        Wait(1000)
+        
+        if isGhostActive and currentGhostData.ped then
+            local playerPed = PlayerPedId()
+            
+            if IsPedInAnyVehicle(playerPed, false) then
+                if DoesEntityExist(currentGhostData.ped) then
+                    RemoveGhost(currentGhostData.ped)
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() == resourceName then
+        if currentGhostData.ped and DoesEntityExist(currentGhostData.ped) then
+            DeleteEntity(currentGhostData.ped)
+        end
+        
+        for _, ghost in ipairs(activeEntities.ghosts) do
+            if DoesEntityExist(ghost) then
+                DeleteEntity(ghost)
+            end
+        end
+        
+        activeEntities.ghosts = {}
+    end
+end)
 
 RegisterNetEvent('horror:environmental')
 AddEventHandler('horror:environmental', function()
