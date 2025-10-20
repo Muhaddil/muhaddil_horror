@@ -1,17 +1,50 @@
-ESX = exports['es_extended']:getSharedObject()
+if Config.FrameWork == "auto" then
+    if GetResourceState('es_extended') == 'started' then
+        ESX = exports['es_extended']:getSharedObject()
+        FrameWork = 'esx'
+    elseif GetResourceState('qb-core') == 'started' then
+        QBCore = exports['qb-core']:GetCoreObject()
+        FrameWork = 'qb'
+    end
+elseif Config.FrameWork == "esx" and GetResourceState('es_extended') == 'started' then
+    ESX = exports['es_extended']:getSharedObject()
+    FrameWork = 'esx'
+elseif Config.FrameWork == "qb" and GetResourceState('qb-core') == 'started' then
+    QBCore = exports['qb-core']:GetCoreObject()
+    FrameWork = 'qb'
+else
+    print('===NO SUPPORTED FRAMEWORK FOUND===')
+end
+
 local playerStats = {}
 local globalEventsActive = false
 local adminPermissions = {}
 
 local function HasAdminPermission(source)
-    if IsPlayerAceAllowed(source, "horror.admin") then
-        return true
+    local src = source
+    if FrameWork == 'qb' then
+        for _, group in ipairs(Config.AllowedGroups.qb) do
+            if QBCore.Functions.HasPermission(src, group) then
+                return true
+            end
+        end
     end
 
-    local xPlayer = ESX.GetPlayerFromId(source)
+    if FrameWork == 'esx' then
+        local xPlayer = ESX.GetPlayerFromId(src)
+        if xPlayer then
+            for _, group in ipairs(Config.AllowedGroups.esx) do
+                if xPlayer.getGroup() == group then
+                    return true
+                end
+            end
+        end
+    end
 
-    if xPlayer.getGroup() == 'admin' then
-        return true
+    for _, aceGroup in ipairs(Config.AllowedGroups.ace) do
+        if IsPlayerAceAllowed(src, aceGroup) then
+            return true
+        end
     end
 
     return false

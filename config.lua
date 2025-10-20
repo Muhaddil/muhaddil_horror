@@ -3,6 +3,12 @@ Config = {}
 Config.EnableHorrorSystem = true
 Config.DebugMode = false
 Config.EnableBlindness = false -- No va bien
+Config.FrameWork = "auto" -- auto, qb, esx (for perms)
+Config.AllowedGroups = {
+    qb = { "admin", "god" },         -- QBCore roles
+    esx = { "admin", "superadmin" }, -- ESX groups
+    ace = { "horrorsystem" }      -- ACE permissions
+}
 
 Config.OnlyAtNight = true
 Config.NightHours = {

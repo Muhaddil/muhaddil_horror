@@ -50,6 +50,11 @@ A comprehensive horror experience system for FiveM servers that adds atmospheric
 
 The system is highly configurable through the `config.lua` file:
 
+### Permissions
+Add this to use ACE permissions:
+
+`add_ace group.admin horrorsystem allow # allow all commands`
+
 ### General Settings
 ```lua
 Config.EnableHorrorSystem = true  -- Master toggle
@@ -143,18 +148,6 @@ exports['muhaddil_horror']:GetPlayerStats(id)     -- Get player statistics
 exports['muhaddil_horror']:GetAllStats()          -- Get all player statistics
 exports['muhaddil_horror']:IsGlobalEventActive()  -- Check if global event is active
 exports['muhaddil_horror']:SetGlobalEvent(bool)   -- Set global event state
-```
-
-## 🔄 Integration
-
-### ESX Integration
-The system integrates with ESX for admin permissions:
-
-```lua
-local xPlayer = ESX.GetPlayerFromId(source)
-if xPlayer.getGroup() == 'admin' then
-    -- Admin permissions granted
-end
 ```
 
 ### Custom Integration
