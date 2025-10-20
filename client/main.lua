@@ -29,7 +29,7 @@ local activeEntities = {
 
 function IsNightTime()
     if not Config.OnlyAtNight then
-        return true 
+        return true
     end
 
     local hour = GetClockHours()

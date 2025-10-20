@@ -7,13 +7,34 @@ local function HasAdminPermission(source)
     if IsPlayerAceAllowed(source, "horror.admin") then
         return true
     end
-    
+
     local xPlayer = ESX.GetPlayerFromId(source)
 
     if xPlayer.getGroup() == 'admin' then
         return true
     end
-    
+
+    return false
+end
+
+local function IsPlayerWhitelisted(source)
+    if not Config.WhiteList or not Config.WhiteList.enabled then return false end
+
+    local identifiers = GetPlayerIdentifiers(source)
+    for _, id in ipairs(identifiers) do
+        for _, whitelisted in ipairs(Config.WhiteList.players) do
+            if id == whitelisted then
+                return true
+            end
+        end
+    end
+
+    for _, whitelisted in ipairs(Config.WhiteList.players) do
+        if whitelisted == source then
+            return true
+        end
+    end
+
     return false
 end
 
@@ -41,7 +62,7 @@ end)
 RegisterNetEvent('horror:syncEvent')
 AddEventHandler('horror:syncEvent', function(eventType, data)
     local source = source
-    
+
     if playerStats[source] then
         playerStats[source].lastEvent = {
             type = eventType,
@@ -49,15 +70,15 @@ AddEventHandler('horror:syncEvent', function(eventType, data)
             data = data
         }
     end
-    
+
     if Config.SyncEvents then
         local coords = GetEntityCoords(GetPlayerPed(source))
         local players = GetPlayers()
-        
+
         for _, playerId in ipairs(players) do
             local playerCoords = GetEntityCoords(GetPlayerPed(playerId))
             local distance = #(coords - playerCoords)
-            
+
             if distance < 50.0 and playerId ~= source then
                 TriggerClientEvent('horror:receiveSync', playerId, eventType, data)
             end
@@ -68,7 +89,7 @@ end)
 RegisterNetEvent('horror:logEvent')
 AddEventHandler('horror:logEvent', function(eventType)
     local source = source
-    
+
     if not playerStats[source] then
         playerStats[source] = {
             totalJumpscares = 0,
@@ -77,7 +98,7 @@ AddEventHandler('horror:logEvent', function(eventType)
             timeInZones = 0
         }
     end
-    
+
     if eventType == "jumpscare" then
         playerStats[source].totalJumpscares = playerStats[source].totalJumpscares + 1
     elseif eventType == "whisper" then
@@ -85,7 +106,7 @@ AddEventHandler('horror:logEvent', function(eventType)
     elseif eventType == "ghost" then
         playerStats[source].totalGhosts = playerStats[source].totalGhosts + 1
     end
-    
+
     if Config.DebugMode then
         print(string.format('[HORROR] Jugador %s experimentó: %s', GetPlayerName(source), eventType))
     end
@@ -116,104 +137,142 @@ end)
 RegisterCommand('horrorevent', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
         TriggerClientEvent('chat:addMessage', source, {
-            color = {255, 0, 0},
-            args = {"[HORROR]", "No tienes permisos para este comando"}
+            color = { 255, 0, 0 },
+            args = { "[HORROR]", "No tienes permisos para este comando" }
         })
         return
     end
-    
+
     if not args[1] then
-        local msg = source == 0 and print or function(m) TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", m}}) end
+        local msg = source == 0 and print or
+            function(m) TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", m } }) end
         msg("Uso: /horrorevent [start/stop/status]")
         return
     end
-    
+
     if args[1] == "start" then
         globalEventsActive = true
         TriggerClientEvent('horror:globalEventStart', -1)
-        
+
         local msg = "^2[HORROR]^7 Evento global de terror iniciado en todo el servidor"
         if source == 0 then
             print(msg)
         else
             TriggerClientEvent('chat:addMessage', -1, {
-                color = {255, 0, 0},
+                color = { 255, 0, 0 },
                 multiline = true,
-                args = {"[EVENTO GLOBAL]", "¡Un evento de terror ha comenzado! Los horrores están en todas partes..."}
+                args = { "[EVENTO GLOBAL]", "¡Un evento de terror ha comenzado! Los horrores están en todas partes..." }
             })
         end
-        
     elseif args[1] == "stop" then
         globalEventsActive = false
         TriggerClientEvent('horror:globalEventStop', -1)
-        
+
         local msg = "^1[HORROR]^7 Evento global de terror detenido"
         if source == 0 then
             print(msg)
         else
             TriggerClientEvent('chat:addMessage', -1, {
-                color = {0, 255, 0},
-                args = {"[EVENTO GLOBAL]", "El evento de terror ha terminado. Todo vuelve a la normalidad..."}
+                color = { 0, 255, 0 },
+                args = { "[EVENTO GLOBAL]", "El evento de terror ha terminado. Todo vuelve a la normalidad..." }
             })
         end
-        
     elseif args[1] == "status" then
         local status = globalEventsActive and "^2ACTIVO^7" or "^1INACTIVO^7"
         local msg = string.format("^3[HORROR]^7 Estado del evento global: %s", status)
-        
+
         if source == 0 then
             print(msg)
         else
-            TriggerClientEvent('chat:addMessage', source, {args = {msg}})
+            TriggerClientEvent('chat:addMessage', source, { args = { msg } })
         end
     end
 end, true)
 
 RegisterCommand('horrorjump', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrorjump [ID] o /horrorjump all"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     if args[1] == "all" then
-        TriggerClientEvent('horror:adminForce', -1, 'jumpscare')
+        for _, playerId in ipairs(GetPlayers()) do
+            if not IsPlayerWhitelisted(tonumber(playerId)) then
+                TriggerClientEvent('horror:adminForce', playerId, 'jumpscare')
+            end
+        end
         local msg = "Jumpscare enviado a todos los jugadores"
-        if source == 0 then print("^2[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then
+            print("^2[HORROR]^7 " .. msg)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[HORROR]", msg } })
+        end
     else
         local targetId = tonumber(args[1])
+        if IsPlayerWhitelisted(targetId) then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = { 255, 0, 0 },
+                args = { "[HORROR]", "No puedes aplicar efectos de horror a jugadores en la WhiteList." }
+            })
+            return
+        end
+
         if targetId and GetPlayerName(targetId) then
             TriggerClientEvent('horror:adminForce', targetId, 'jumpscare')
             local msg = "Jumpscare enviado a " .. GetPlayerName(targetId)
-            if source == 0 then print("^2[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+            if source == 0 then
+                print("^2[HORROR]^7 " .. msg)
+            else
+                TriggerClientEvent('chat:addMessage', source,
+                    { args = { "[HORROR]", msg } })
+            end
         else
             local msg = "Jugador no encontrado"
-            if source == 0 then print("^1[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+            if source == 0 then
+                print("^1[HORROR]^7 " .. msg)
+            else
+                TriggerClientEvent('chat:addMessage', source,
+                    { args = { "[HORROR]", msg } })
+            end
         end
     end
 end, true)
 
 RegisterCommand('horrorwhisper', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrorwhisper [ID] o /horrorwhisper all"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     if args[1] == "all" then
-        TriggerClientEvent('horror:adminForce', -1, 'whisper')
+        for _, playerId in ipairs(GetPlayers()) do
+            if not IsPlayerWhitelisted(tonumber(playerId)) then
+                TriggerClientEvent('horror:adminForce', playerId, 'whisper')
+            end
+        end
     else
         local targetId = tonumber(args[1])
+        if IsPlayerWhitelisted(targetId) then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = { 255, 0, 0 },
+                args = { "[HORROR]", "No puedes aplicar efectos de horror a jugadores en la WhiteList." }
+            })
+            return
+        end
+
         if targetId and GetPlayerName(targetId) then
             TriggerClientEvent('horror:adminForce', targetId, 'whisper')
         end
@@ -222,20 +281,32 @@ end, true)
 
 RegisterCommand('horrordistort', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrordistort [ID] o /horrordistort all"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     if args[1] == "all" then
-        TriggerClientEvent('horror:adminForce', -1, 'distortion')
+        for _, playerId in ipairs(GetPlayers()) do
+            if not IsPlayerWhitelisted(tonumber(playerId)) then
+                TriggerClientEvent('horror:adminForce', playerId, 'distortion')
+            end
+        end
     else
         local targetId = tonumber(args[1])
+        if IsPlayerWhitelisted(targetId) then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = { 255, 0, 0 },
+                args = { "[HORROR]", "No puedes aplicar efectos de horror a jugadores en la WhiteList." }
+            })
+            return
+        end
+
         if targetId and GetPlayerName(targetId) then
             TriggerClientEvent('horror:adminForce', targetId, 'distortion')
         end
@@ -244,20 +315,32 @@ end, true)
 
 RegisterCommand('horrorghost', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrorghost [ID] o /horrorghost all"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     if args[1] == "all" then
-        TriggerClientEvent('horror:adminForce', -1, 'ghost')
+        for _, playerId in ipairs(GetPlayers()) do
+            if not IsPlayerWhitelisted(tonumber(playerId)) then
+                TriggerClientEvent('horror:adminForce', playerId, 'ghost')
+            end
+        end
     else
         local targetId = tonumber(args[1])
+        if IsPlayerWhitelisted(targetId) then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = { 255, 0, 0 },
+                args = { "[HORROR]", "No puedes aplicar efectos de horror a jugadores en la WhiteList." }
+            })
+            return
+        end
+
         if targetId and GetPlayerName(targetId) then
             TriggerClientEvent('horror:adminForce', targetId, 'ghost')
         end
@@ -266,20 +349,32 @@ end, true)
 
 RegisterCommand('horrorenv', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrorenv [ID] o /horrorenv all"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     if args[1] == "all" then
-        TriggerClientEvent('horror:adminForce', -1, 'environmental')
+        for _, playerId in ipairs(GetPlayers()) do
+            if not IsPlayerWhitelisted(tonumber(playerId)) then
+                TriggerClientEvent('horror:adminForce', playerId, 'environmental')
+            end
+        end
     else
         local targetId = tonumber(args[1])
+        if IsPlayerWhitelisted(targetId) then
+            TriggerClientEvent('chat:addMessage', source, {
+                color = { 255, 0, 0 },
+                args = { "[HORROR]", "No puedes aplicar efectos de horror a jugadores en la WhiteList." }
+            })
+            return
+        end
+
         if targetId and GetPlayerName(targetId) then
             TriggerClientEvent('horror:adminForce', targetId, 'environmental')
         end
@@ -288,75 +383,106 @@ end, true)
 
 RegisterCommand('horrorcombo', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrorcombo [ID] - Activa TODOS los efectos en un jugador"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     local targetId = tonumber(args[1])
+    if IsPlayerWhitelisted(targetId) then
+        TriggerClientEvent('chat:addMessage', source, {
+            color = { 255, 0, 0 },
+            args = { "[HORROR]", "No puedes aplicar efectos de horror a jugadores en la WhiteList." }
+        })
+        return
+    end
+
     if targetId and GetPlayerName(targetId) then
         TriggerClientEvent('horror:adminCombo', targetId)
         local msg = "Combo de terror activado en " .. GetPlayerName(targetId)
-        if source == 0 then print("^1[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then
+            print("^1[HORROR]^7 " .. msg)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[HORROR]", msg } })
+        end
     end
 end, true)
 
 RegisterCommand('horrorimmune', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] then
         local msg = "Uso: /horrorimmune [ID] - Activa/desactiva inmunidad"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     local targetId = tonumber(args[1])
     if targetId and GetPlayerName(targetId) and playerStats[targetId] then
         playerStats[targetId].immuneToHorror = not playerStats[targetId].immuneToHorror
         TriggerClientEvent('horror:setImmunity', targetId, playerStats[targetId].immuneToHorror)
-        
+
         local status = playerStats[targetId].immuneToHorror and "activada" or "desactivada"
         local msg = string.format("Inmunidad %s para %s", status, GetPlayerName(targetId))
-        if source == 0 then print("^3[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then
+            print("^3[HORROR]^7 " .. msg)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[HORROR]", msg } })
+        end
     end
 end, true)
 
 RegisterCommand('horrortele', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if not args[1] or not args[2] then
         local msg = "Uso: /horrortele [ID] [zona]\nZonas: cementerio, bosque, casa, tunel"
-        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[HORROR]", msg } }) end
         return
     end
-    
+
     local targetId = tonumber(args[1])
+    if IsPlayerWhitelisted(targetId) then
+        TriggerClientEvent('chat:addMessage', source, {
+            color = { 255, 0, 0 },
+            args = { "[HORROR]", "No puedes teletransportar a jugadores en la WhiteList." }
+        })
+        return
+    end
+
     local zoneName = args[2]:lower()
-    
+
     local zones = {
         cementerio = vector3(-1705.0, -220.0, 58.0),
         bosque = vector3(-1470.0, 4975.0, 65.0),
         casa = vector3(1395.0, 1141.0, 114.0),
         tunel = vector3(-595.0, -1637.0, 20.0)
     }
-    
+
     if targetId and GetPlayerName(targetId) and zones[zoneName] then
         local coords = zones[zoneName]
         SetEntityCoords(GetPlayerPed(targetId), coords.x, coords.y, coords.z)
-        
+
         local msg = string.format("Teletransportado %s a zona: %s", GetPlayerName(targetId), zoneName)
-        if source == 0 then print("^3[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then
+            print("^3[HORROR]^7 " .. msg)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[HORROR]", msg } })
+        end
     end
 end, true)
 
@@ -374,10 +500,10 @@ RegisterCommand('horrorstats', function(source, args)
             if playerStats[source] then
                 local stats = playerStats[source]
                 TriggerClientEvent('chat:addMessage', source, {
-                    color = {255, 100, 100},
+                    color = { 255, 100, 100 },
                     multiline = true,
-                    args = {"[HORROR]", string.format("Tus estadísticas: Jumpscares: %d | Susurros: %d | Fantasmas: %d",
-                        stats.totalJumpscares, stats.totalWhispers, stats.totalGhosts)}
+                    args = { "[HORROR]", string.format("Tus estadísticas: Jumpscares: %d | Susurros: %d | Fantasmas: %d",
+                        stats.totalJumpscares, stats.totalWhispers, stats.totalGhosts) }
                 })
             end
         elseif HasAdminPermission(source) then
@@ -385,9 +511,9 @@ RegisterCommand('horrorstats', function(source, args)
             if targetId and playerStats[targetId] then
                 local stats = playerStats[targetId]
                 TriggerClientEvent('chat:addMessage', source, {
-                    color = {255, 100, 100},
-                    args = {"[HORROR]", string.format("%s: J:%d S:%d F:%d", 
-                        GetPlayerName(targetId), stats.totalJumpscares, stats.totalWhispers, stats.totalGhosts)}
+                    color = { 255, 100, 100 },
+                    args = { "[HORROR]", string.format("%s: J:%d S:%d F:%d",
+                        GetPlayerName(targetId), stats.totalJumpscares, stats.totalWhispers, stats.totalGhosts) }
                 })
             end
         end
@@ -396,10 +522,10 @@ end, false)
 
 RegisterCommand('horrorreset', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     if args[1] then
         local targetId = tonumber(args[1])
         if targetId and playerStats[targetId] then
@@ -407,23 +533,33 @@ RegisterCommand('horrorreset', function(source, args)
             playerStats[targetId].totalWhispers = 0
             playerStats[targetId].totalGhosts = 0
             playerStats[targetId].timeInZones = 0
-            
+
             local msg = "Stats reseteadas para " .. GetPlayerName(targetId)
-            if source == 0 then print("^2[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+            if source == 0 then
+                print("^2[HORROR]^7 " .. msg)
+            else
+                TriggerClientEvent('chat:addMessage', source,
+                    { args = { "[HORROR]", msg } })
+            end
         end
     else
         playerStats = {}
         local msg = "Todas las estadísticas reseteadas"
-        if source == 0 then print("^2[HORROR]^7 " .. msg) else TriggerClientEvent('chat:addMessage', source, {args = {"[HORROR]", msg}}) end
+        if source == 0 then
+            print("^2[HORROR]^7 " .. msg)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[HORROR]", msg } })
+        end
     end
 end, true)
 
 RegisterCommand('horrorhelp', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, {color = {255, 0, 0}, args = {"[HORROR]", "Sin permisos"}})
+        TriggerClientEvent('chat:addMessage', source, { color = { 255, 0, 0 }, args = { "[HORROR]", "Sin permisos" } })
         return
     end
-    
+
     local commands = {
         "^3=== COMANDOS DE ADMIN HORROR ===^7",
         "/horrorevent [start/stop/status] - Control evento global",
@@ -439,14 +575,14 @@ RegisterCommand('horrorhelp', function(source, args)
         "/horrorreset [ID] - Reset stats",
         "^3===========================^7"
     }
-    
+
     if source == 0 then
         for _, cmd in ipairs(commands) do
             print(cmd)
         end
     else
         for _, cmd in ipairs(commands) do
-            TriggerClientEvent('chat:addMessage', source, {args = {"", cmd}})
+            TriggerClientEvent('chat:addMessage', source, { args = { "", cmd } })
         end
     end
 end, true)

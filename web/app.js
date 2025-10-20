@@ -65,13 +65,12 @@ class HorrorSystem {
     notification.className = `notification ${data.isLeaving ? "leaving" : ""} intensity-${data.intensity || "low"}`;
 
     const icon = data.isLeaving ? "✓" : "⚠️";
-    
+
     notification.innerHTML = `
       <div class="notification-icon">${icon}</div>
       <div class="notification-content">
-        <div class="notification-title">${
-          data.zoneName || (data.isLeaving ? "Zona Segura" : "Advertencia")
-        }</div>
+        <div class="notification-title">${data.zoneName || (data.isLeaving ? "Zona Segura" : "Advertencia")
+      }</div>
         <div class="notification-message">${data.message}</div>
       </div>
     `;
@@ -136,41 +135,41 @@ class HorrorSystem {
     return texts[intensity] || intensity;
   }
 
-  triggerJumpscare(type) {
+  async triggerJumpscare() {
     const overlay = document.getElementById("jumpscare-overlay");
     const image = document.getElementById("jumpscare-image");
 
-    const jumpscareImages = {
-      ghost: "images/jumpscare-ghost.jpg",
-      demon: "images/jumpscare-demon.jpg",
-      zombie: "images/jumpscare-zombie.jpg",
-      shadow: "images/jumpscare-shadow.jpg",
-      clown: "images/jumpscare-clown.jpg",
-    };
+    try {
+      const res = await fetch("list.json");
+      const images = await res.json();
 
-    image.src = jumpscareImages[type] || jumpscareImages.ghost;
-    overlay.classList.remove("hidden");
+      const randomImage = images[Math.floor(Math.random() * images.length)];
+      image.src = randomImage;
+      overlay.classList.remove("hidden");
 
-    const screamSounds = ["scream1", "scream2", "scream3"];
-    const randomScream = screamSounds[Math.floor(Math.random() * screamSounds.length)];
-    this.audioManager.playSound(randomScream, 0.9, false, 5000);
+      const screamSounds = Object.keys(SOUND_URLS).filter(key => /^scream\d+$/.test(key));
+      const randomScream = screamSounds[Math.floor(Math.random() * screamSounds.length)];
+      this.audioManager.playSound(randomScream, 0.9, false, 2000);
 
-    const glitchOverlay = document.getElementById("jumpscare-glitch");
-    glitchOverlay.style.opacity = "1";
+      const glitchOverlay = document.getElementById("jumpscare-glitch");
+      glitchOverlay.style.opacity = "1";
+      document.body.style.animation = "slowMotion 0.5s ease-out";
 
-    document.body.style.animation = "slowMotion 0.5s ease-out";
+      setTimeout(() => {
+        overlay.classList.add("hidden");
+        glitchOverlay.style.opacity = "0";
+        document.body.style.animation = "";
+      }, 1000);
 
-    setTimeout(() => {
-      overlay.classList.add("hidden");
-      glitchOverlay.style.opacity = "0";
-      document.body.style.animation = "";
-    }, 1000);
+    } catch (err) {
+      console.error("Error cargando jumpscares:", err);
+    }
   }
-
+  
   playWhisper(sound) {
     const whisperSounds = ["whisper1", "whisper2"];
     const randomWhisper = whisperSounds[Math.floor(Math.random() * whisperSounds.length)];
-    
+
     this.audioManager.playSound(randomWhisper, 0.4, false, 10000);
 
     this.createWhisperEffect();
@@ -226,7 +225,7 @@ class HorrorSystem {
   applyStaticEffect(duration) {
     const element = document.getElementById("static-effect");
     element.classList.remove("hidden");
-    
+
     setTimeout(() => {
       element.classList.add("hidden");
       this.activeEffects.delete("static");
@@ -236,7 +235,7 @@ class HorrorSystem {
   applyChromaticEffect(duration) {
     const element = document.getElementById("chromatic-effect");
     element.classList.remove("hidden");
-    
+
     setTimeout(() => {
       element.classList.add("hidden");
       this.activeEffects.delete("chromatic");
@@ -341,7 +340,7 @@ class HorrorSystem {
   createPersistentFog() {
     document.body.style.filter = "blur(2px) brightness(0.7)";
     this.audioManager.playAmbient("ambient2", 0.25);
-    
+
     setTimeout(() => {
       document.body.style.filter = "";
       this.audioManager.stopAmbient();
@@ -351,11 +350,11 @@ class HorrorSystem {
   playFootstepsSequence() {
     let steps = 0;
     const maxSteps = Math.floor(Math.random() * 5) + 3;
-    
+
     const stepInterval = setInterval(() => {
       this.audioManager.playSound("footsteps", 0.5 + Math.random() * 0.3, false, 800);
       steps++;
-      
+
       if (steps >= maxSteps) {
         clearInterval(stepInterval);
       }
@@ -366,13 +365,13 @@ class HorrorSystem {
     let beats = 0;
     const maxBeats = 12;
     let beatInterval = 900;
-    
+
     const heartbeatLoop = setInterval(() => {
       this.audioManager.playSound("heartbeat", 0.7, false, 500);
       beats++;
-      
+
       beatInterval = Math.max(400, beatInterval - 40);
-      
+
       if (beats >= maxBeats) {
         clearInterval(heartbeatLoop);
       }
@@ -391,7 +390,7 @@ class HorrorSystem {
       z-index: 300;
       animation: doorCreak 0.5s ease-out;
     `;
-    
+
     document.body.appendChild(doorFlash);
     setTimeout(() => doorFlash.remove(), 500);
   }
@@ -413,7 +412,7 @@ class HorrorSystem {
   createFloatingObjects() {
     const objects = ["📖", "🕯️", "🪑", "🖼️", "⚰️"];
     const numObjects = Math.floor(Math.random() * 3) + 2;
-    
+
     for (let i = 0; i < numObjects; i++) {
       setTimeout(() => {
         const obj = document.createElement("div");
@@ -427,7 +426,7 @@ class HorrorSystem {
           animation: floatObject 4s ease-in-out;
           pointer-events: none;
         `;
-        
+
         document.body.appendChild(obj);
         setTimeout(() => obj.remove(), 4000);
       }, i * 800);
@@ -437,7 +436,7 @@ class HorrorSystem {
   createShadowFigures() {
     const positions = ["left", "right"];
     const position = positions[Math.floor(Math.random() * positions.length)];
-    
+
     const shadow = document.createElement("div");
     shadow.style.cssText = `
       position: fixed;
@@ -450,11 +449,11 @@ class HorrorSystem {
       animation: shadowFigureAppear 3s ease-out;
       clip-path: ellipse(40% 50% at 50% 80%);
     `;
-    
+
     document.body.appendChild(shadow);
-    
+
     this.audioManager.playSound("whisper1", 0.4, false, 3000);
-    
+
     setTimeout(() => shadow.remove(), 3000);
   }
 
@@ -466,9 +465,9 @@ class HorrorSystem {
       "AYUDA",
       "VETE"
     ];
-    
+
     const message = messages[Math.floor(Math.random() * messages.length)];
-    
+
     const textElement = document.createElement("div");
     textElement.textContent = message;
     textElement.style.cssText = `
@@ -486,15 +485,15 @@ class HorrorSystem {
       letter-spacing: 0.2em;
       opacity: 0;
     `;
-    
+
     document.body.appendChild(textElement);
-    
+
     setTimeout(() => {
       textElement.style.opacity = "0.9";
     }, 100);
-    
+
     this.audioManager.playSound("scream2", 0.4, false, 2000);
-    
+
     setTimeout(() => {
       textElement.style.opacity = "0";
       setTimeout(() => textElement.remove(), 1000);
@@ -538,15 +537,15 @@ class HorrorSystem {
 
   updateSanity(sanity) {
     this.sanity = Math.max(0, Math.min(100, sanity));
-    
+
     const sanityFill = document.getElementById("sanity-fill");
     const sanityText = document.getElementById("sanity-text");
     const sanityMeter = document.getElementById("sanity-meter");
-    
+
     if (sanityFill && sanityText) {
       sanityFill.style.width = `${this.sanity}%`;
       sanityText.textContent = `${Math.floor(this.sanity)}%`;
-      
+
       if (this.sanity < 30) {
         sanityFill.style.background = "linear-gradient(90deg, #8b0000, #ff0000)";
         sanityMeter.classList.add("critical");
@@ -557,7 +556,7 @@ class HorrorSystem {
         sanityFill.style.background = "linear-gradient(90deg, #00ff00, #44ff44)";
         sanityMeter.classList.remove("critical");
       }
-      
+
       if (this.inZone && this.sanity < 100) {
         sanityMeter.classList.remove("hidden");
       } else if (!this.inZone || this.sanity >= 100) {

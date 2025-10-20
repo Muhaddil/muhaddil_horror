@@ -259,3 +259,11 @@ Config.Performance = {
     cleanupInterval = 300000,
     disableInVehicle = true
 }
+
+Config.WhiteList = {
+    enabled = true,
+    players = {
+        "license:1234567890abcdef",
+        "steam:110000104abcd12",
+    }
+}

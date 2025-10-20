@@ -4,6 +4,14 @@ const SOUND_URLS = {
   scream1: "https://assets.mixkit.co/active_storage/sfx/2482/2482-preview.mp3",
   scream2: "https://assets.mixkit.co/active_storage/sfx/1830/1830-preview.mp3",
   scream3: "https://assets.mixkit.co/active_storage/sfx/2487/2487-preview.mp3",
+  scream4: "https://cdn.pixabay.com/audio/2025/06/01/audio_965d6c9750.mp3",
+  scream5: "https://cdn.pixabay.com/audio/2022/03/24/audio_2a0d12274f.mp3",
+  scream6: "https://cdn.pixabay.com/audio/2025/03/13/audio_795979df88.mp3",
+  scream7: "https://cdn.pixabay.com/audio/2025/07/24/audio_905848630b.mp3",
+  scream8: "https://cdn.pixabay.com/audio/2022/03/15/audio_de85bac61d.mp3",
+  scream9: "https://cdn.pixabay.com/audio/2025/09/17/audio_15a5de459b.mp3",
+  scream10: "https://cdn.pixabay.com/audio/2021/08/04/audio_846a477bd5.mp3",
+  scream11: "https://files.fivemerr.com/audios/998a3949-01e6-4420-980a-674d4a53e93e.mp3",
 
   whisper1: "https://assets.mixkit.co/active_storage/sfx/2483/2483-preview.mp3",
   whisper2: "https://assets.mixkit.co/active_storage/sfx/2484/2484-preview.mp3",
@@ -23,9 +31,9 @@ const SOUND_URLS = {
   heartbeat: "https://assets.mixkit.co/active_storage/sfx/2490/2490-preview.mp3",
   door: "https://assets.mixkit.co/active_storage/sfx/2491/2491-preview.mp3",
   thunder: "https://assets.mixkit.co/active_storage/sfx/1704/1704-preview.mp3",
-  
+
   notification: "https://assets.mixkit.co/active_storage/sfx/1646/1646-preview.mp3",
-  
+
   breathing: "https://assets.mixkit.co/active_storage/sfx/2483/2483-preview.mp3",
 };
 
@@ -35,16 +43,18 @@ class AudioManager {
     this.currentAmbient = null;
     this.preloadedSounds = new Set();
     this.maxVolume = 1.0;
-    
+
     this.preloadCriticalSounds();
   }
 
   preloadCriticalSounds() {
-    const criticalSounds = ['scream1', 'scream2', 'scream3', 'ambient1', 'ambient2'];
+    const screamSounds = Object.keys(SOUND_URLS).filter(key => /^scream\d+$/.test(key));
+    const extraSounds = ['ambient1', 'ambient2'];
+
+    const criticalSounds = [...screamSounds, ...extraSounds];
+
     criticalSounds.forEach(soundName => {
-      if (SOUND_URLS[soundName]) {
-        this.preloadSound(soundName, SOUND_URLS[soundName]);
-      }
+      this.preloadSound(soundName, SOUND_URLS[soundName]);
     });
   }
 
@@ -54,12 +64,12 @@ class AudioManager {
         const audio = new Audio(url);
         audio.preload = "auto";
         audio.volume = 0;
-        
+
         audio.load();
-        
+
         this.sounds[name] = audio;
         this.preloadedSounds.add(name);
-        
+
         if (window.DEBUG_MODE) {
           console.log(`✅ Sonido precargado: ${name}`);
         }
@@ -71,7 +81,7 @@ class AudioManager {
 
   playSound(name, volume = 1.0, loop = false, duration = null) {
     const url = SOUND_URLS[name];
-    
+
     if (!url) {
       console.warn(`⚠️ Sonido "${name}" no encontrado en SOUND_URLS`);
       return null;
@@ -87,7 +97,7 @@ class AudioManager {
       sound.loop = loop;
 
       const playPromise = sound.play();
-      
+
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
@@ -154,7 +164,7 @@ class AudioManager {
         // Ignorar errores al detener
       }
     });
-    
+
     this.stopAmbient();
   }
 
@@ -167,7 +177,7 @@ class AudioManager {
 
     const startVolume = sound.volume;
     const fadeStep = startVolume / (duration / 50);
-    
+
     const fadeInterval = setInterval(() => {
       if (sound.volume > fadeStep) {
         sound.volume -= fadeStep;
@@ -184,7 +194,7 @@ class AudioManager {
 
     sound.volume = 0;
     const fadeStep = targetVolume / (duration / 50);
-    
+
     const fadeInterval = setInterval(() => {
       if (sound.volume < targetVolume - fadeStep) {
         sound.volume += fadeStep;
