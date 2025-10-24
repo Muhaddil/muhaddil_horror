@@ -2,12 +2,12 @@ Config = {}
 
 Config.EnableHorrorSystem = true
 Config.DebugMode = false
-Config.EnableBlindness = false -- No va bien
-Config.FrameWork = "auto" -- auto, qb, esx (for perms)
+Config.EnableBlindness = false       -- No va bien
+Config.FrameWork = "auto"            -- auto, qb, esx (for perms)
 Config.AllowedGroups = {
     qb = { "admin", "god" },         -- QBCore roles
     esx = { "admin", "superadmin" }, -- ESX groups
-    ace = { "horrorsystem" }      -- ACE permissions
+    ace = { "horrorsystem" }         -- ACE permissions
 }
 
 Config.OnlyAtNight = true
@@ -272,4 +272,22 @@ Config.WhiteList = {
         "license:1234567890abcdef",
         "steam:110000104abcd12",
     }
+}
+
+Config.RandomPlayerJumpscares = {
+    enabled = true,
+    minTimeBetween = 120000, -- 2 mins
+    maxTimeBetween = 600000, -- 10 mins
+    onlyAtNight = false,
+    excludeAdmins = false,
+    excludeImmune = false,
+    excludeInVehicle = false,
+
+    jumpscareTypes = {
+        { id = "ghost", weight = 30 },
+        { id = "demon", weight = 20 },
+        { id = "zombie", weight = 25 },
+        { id = "shadow", weight = 15 },
+        { id = "clown", weight = 10 }
+    },
 }
