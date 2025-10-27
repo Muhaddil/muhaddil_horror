@@ -1201,3 +1201,7 @@ end)
 exports('ForceEvent', function(eventType)
     TriggerEvent('horror:adminForce', eventType)
 end)
+
+lib.callback.register('horror:getClientClockHour', function()
+    return GetClockHours()
+end)

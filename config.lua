@@ -26,6 +26,7 @@ Config.IntensityProgression = {
     }
 }
 
+-- Another possibilities: "MP_death_grade_blend01"
 Config.HorrorZonesTimeCycleModifier = "MP_Arena_theme_storm"
 Config.HorrorZones = {
     {

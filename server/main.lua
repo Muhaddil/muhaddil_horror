@@ -659,55 +659,55 @@ end)
 local function GetEligiblePlayers()
     local players = GetPlayers()
     local eligible = {}
-    
+
     for _, playerId in ipairs(players) do
         playerId = tonumber(playerId)
         local canTarget = true
-        
+
         if IsPlayerWhitelisted(playerId) then
             canTarget = false
         end
-        
+
         if Config.RandomPlayerJumpscares.excludeAdmins and HasAdminPermission(playerId) then
             canTarget = false
         end
-        
+
         if Config.RandomPlayerJumpscares.excludeImmune and playerStats[playerId] and playerStats[playerId].immuneToHorror then
             canTarget = false
         end
-        
+
         if Config.RandomPlayerJumpscares.excludeInVehicle then
             local ped = GetPlayerPed(playerId)
             if DoesEntityExist(ped) and IsPedInAnyVehicle(ped, false) then
                 canTarget = false
             end
         end
-        
+
         if playerId == lastRandomTarget then
             canTarget = false
         end
-        
+
         if canTarget then
             table.insert(eligible, playerId)
         end
     end
-    
+
     return eligible
 end
 
 local function SelectRandomPlayer()
     local eligiblePlayers = GetEligiblePlayers()
-    
+
     if #eligiblePlayers == 0 then
         if Config.DebugMode then
             print("^3[HORROR]^7 No hay jugadores elegibles para jumpscare random")
         end
         return nil
     end
-    
+
     local randomIndex = math.random(1, #eligiblePlayers)
     local selectedPlayer = eligiblePlayers[randomIndex]
-    
+
     return selectedPlayer
 end
 
@@ -715,45 +715,57 @@ local function ExecuteRandomJumpscare()
     if not Config.RandomPlayerJumpscares.enabled then
         return
     end
-    
+
     if Config.RandomPlayerJumpscares.onlyAtNight then
-        local hour = GetClockHours()
+        local players = GetPlayers()
+        if #players == 0 then return end
+
+        local anyPlayer = tonumber(players[1])
+        local hour = lib.callback.await('horror:getClientClockHour', anyPlayer)
+
+        if not hour then
+            if Config.DebugMode then
+                print("^3[HORROR]^7 No se pudo obtener la hora del cliente")
+            end
+            return
+        end
+
         local startHour = Config.NightHours.start
         local endHour = Config.NightHours.finish
-        
+
         local isNight
         if startHour > endHour then
             isNight = hour >= startHour or hour < endHour
         else
             isNight = hour >= startHour and hour < endHour
         end
-        
+
         if not isNight then
             if Config.DebugMode then
-                print("^3[HORROR]^7 Jumpscare random cancelado: no es de noche")
+                print(("^3[HORROR]^7 Jumpscare random cancelado: no es de noche (hora actual: %d)"):format(hour))
             end
             return
         end
     end
-    
+
     local targetPlayer = SelectRandomPlayer()
-    
+
     if not targetPlayer then
         if Config.DebugMode then
             print("^3[HORROR]^7 No se pudo encontrar jugador para jumpscare random")
         end
         return
     end
-    
+
     local totalWeight = 0
     for _, jumpType in ipairs(Config.RandomPlayerJumpscares.jumpscareTypes) do
         totalWeight = totalWeight + (jumpType.weight or 1)
     end
-    
+
     local randomWeight = math.random() * totalWeight
     local currentWeight = 0
     local selectedType = Config.RandomPlayerJumpscares.jumpscareTypes[1].id
-    
+
     for _, jumpType in ipairs(Config.RandomPlayerJumpscares.jumpscareTypes) do
         currentWeight = currentWeight + (jumpType.weight or 1)
         if randomWeight <= currentWeight then
@@ -761,16 +773,16 @@ local function ExecuteRandomJumpscare()
             break
         end
     end
-    
+
     TriggerClientEvent('horror:adminForce', targetPlayer, 'jumpscare')
-    
+
     if playerStats[targetPlayer] then
         playerStats[targetPlayer].totalJumpscares = (playerStats[targetPlayer].totalJumpscares or 0) + 1
         playerStats[targetPlayer].lastRandomJumpscare = os.time()
     end
-    
+
     lastRandomTarget = targetPlayer
-        
+
     if Config.DebugMode then
         print(("^1[HORROR RANDOM]^7 Jumpscare enviado a %s (Tipo: %s)"):format(GetPlayerName(targetPlayer), selectedType))
     end
@@ -780,12 +792,12 @@ local function ScheduleNextRandomJumpscare()
     if not Config.RandomPlayerJumpscares.enabled then
         return
     end
-    
+
     local minTime = Config.RandomPlayerJumpscares.minTimeBetween
     local maxTime = Config.RandomPlayerJumpscares.maxTimeBetween
-    
+
     nextRandomJumpscare = GetGameTimer() + math.random(minTime, maxTime)
-    
+
     if Config.DebugMode then
         local nextIn = math.floor((nextRandomJumpscare - GetGameTimer()) / 60000)
         print(("^3[HORROR RANDOM]^7 Próximo jumpscare programado en: %d minutos"):format(nextIn))
@@ -794,15 +806,15 @@ end
 
 CreateThread(function()
     Wait(10000)
-    
+
     if Config.RandomPlayerJumpscares.enabled then
         print("^2[HORROR]^7 Sistema de jumpscares random inicializado")
         ScheduleNextRandomJumpscare()
     end
-    
+
     while true do
         Wait(10000)
-        
+
         if Config.RandomPlayerJumpscares.enabled and GetGameTimer() >= nextRandomJumpscare then
             ExecuteRandomJumpscare()
             ScheduleNextRandomJumpscare()
@@ -812,9 +824,9 @@ end)
 
 RegisterCommand('horrorrandom', function(source, args)
     if source ~= 0 and not HasAdminPermission(source) then
-        TriggerClientEvent('chat:addMessage', source, { 
-            color = { 255, 0, 0 }, 
-            args = { "[HORROR]", "No tienes permisos para este comando" } 
+        TriggerClientEvent('chat:addMessage', source, {
+            color = { 255, 0, 0 },
+            args = { "[HORROR]", "No tienes permisos para este comando" }
         })
         return
     end
@@ -824,12 +836,12 @@ RegisterCommand('horrorrandom', function(source, args)
         local timeUntilNext = math.max(0, nextRandomJumpscare - GetGameTimer())
         local minutes = math.floor(timeUntilNext / 60000)
         local seconds = math.floor((timeUntilNext % 60000) / 1000)
-        
+
         local msg = string.format(
             "Estado: %s\nPróximo en: %d:%02d\nJugadores elegibles: %d",
             status, minutes, seconds, #GetEligiblePlayers()
         )
-        
+
         if source == 0 then
             print("^3[HORROR RANDOM]^7 " .. msg)
         else
@@ -873,20 +885,20 @@ RegisterCommand('horrorrandom', function(source, args)
     elseif action == "players" then
         local eligible = GetEligiblePlayers()
         local msg = string.format("Jugadores elegibles (%d): ", #eligible)
-        
+
         for i, playerId in ipairs(eligible) do
             msg = msg .. GetPlayerName(playerId)
             if i < #eligible then
                 msg = msg .. ", "
             end
         end
-        
+
         if source == 0 then
             print("^3[HORROR RANDOM]^7 " .. msg)
         else
-            TriggerClientEvent('chat:addMessage', source, { 
+            TriggerClientEvent('chat:addMessage', source, {
                 multiline = true,
-                args = { "[HORROR RANDOM]", msg } 
+                args = { "[HORROR RANDOM]", msg }
             })
         end
     else
