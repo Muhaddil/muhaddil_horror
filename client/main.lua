@@ -100,6 +100,9 @@ function EnterHorrorZone(zone)
     TriggerServerEvent('horror:playerEnterZone', zone.name)
     TriggerEvent("horror:enterZone", zone)
 
+    SetTimecycleModifier(Config.HorrorZonesTimeCycleModifier)
+    SetTimecycleModifierStrength(1.0)
+
     if Config.DebugMode then
         print(("^3[HORROR]^7 Jugador entró en: %s"):format(zone.name))
     end
@@ -114,6 +117,8 @@ function LeaveHorrorZone()
 
     TriggerServerEvent('horror:playerLeaveZone')
     TriggerEvent("horror:leaveZone")
+
+    ClearTimecycleModifier()
 
     if Config.DebugMode then
         print("^2[HORROR]^7 Jugador salió de zona de terror")
@@ -417,9 +422,9 @@ AddEventHandler('horror:ghostAppearance', function()
         timeout = timeout + 1
     end
 
-    if not HasModelLoaded(ghostModel) then 
+    if not HasModelLoaded(ghostModel) then
         isGhostActive = false
-        return 
+        return
     end
 
     local distance = math.random(10, 15)
@@ -489,7 +494,8 @@ AddEventHandler('horror:ghostAppearance', function()
     end
 
     if HasAnimDictLoaded("melee@knife@streamed_core") then
-        TaskPlayAnim(ghostPed, "melee@knife@streamed_core", "ground_attack_on_spot", 8.0, -8.0, -1, 49, 0, false, false, false)
+        TaskPlayAnim(ghostPed, "melee@knife@streamed_core", "ground_attack_on_spot", 8.0, -8.0, -1, 49, 0, false, false,
+            false)
     end
 
     PlaySoundFrontend(-1, "TIMER_STOP", "HUD_MINI_GAME_SOUNDSET", true)
@@ -549,7 +555,7 @@ AddEventHandler('horror:ghostAppearance', function()
                 if DoesEntityExist(PlayerPedId()) then
                     SetPedToRagdoll(PlayerPedId(), 3000, 3000, 0, false, false, false)
                 end
-                
+
                 RemoveGhost(ghostPed)
                 Wait(3000)
                 DoScreenFadeIn(2000)
@@ -602,11 +608,11 @@ function RemoveGhost(ghost)
     while DoesEntityExist(ghost) and deleteAttempts < 5 do
         SetEntityAsMissionEntity(ghost, false, true)
         DeleteEntity(ghost)
-        
+
         if DoesEntityExist(ghost) then
             DeletePed(ghost)
         end
-        
+
         deleteAttempts = deleteAttempts + 1
         Wait(100)
     end
@@ -631,10 +637,10 @@ end
 CreateThread(function()
     while true do
         Wait(1000)
-        
+
         if isGhostActive and currentGhostData.ped then
             local playerPed = PlayerPedId()
-            
+
             if IsPedInAnyVehicle(playerPed, false) then
                 if DoesEntityExist(currentGhostData.ped) then
                     RemoveGhost(currentGhostData.ped)
@@ -649,13 +655,13 @@ AddEventHandler('onResourceStop', function(resourceName)
         if currentGhostData.ped and DoesEntityExist(currentGhostData.ped) then
             DeleteEntity(currentGhostData.ped)
         end
-        
+
         for _, ghost in ipairs(activeEntities.ghosts) do
             if DoesEntityExist(ghost) then
                 DeleteEntity(ghost)
             end
         end
-        
+
         activeEntities.ghosts = {}
     end
 end)

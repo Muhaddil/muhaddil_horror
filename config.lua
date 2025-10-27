@@ -26,6 +26,7 @@ Config.IntensityProgression = {
     }
 }
 
+Config.HorrorZonesTimeCycleModifier = "MP_Arena_theme_storm"
 Config.HorrorZones = {
     {
         name = "Cementerio",
