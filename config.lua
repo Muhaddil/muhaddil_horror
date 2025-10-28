@@ -293,3 +293,203 @@ Config.RandomPlayerJumpscares = {
         { id = "clown", weight = 10 }
     },
 }
+
+Config.PumpkinHunt = {
+    enabled = true,
+    
+    eventStartDate = "2025-10-20",
+    eventEndDate = "2025-11-05",
+    checkDateOnCollection = false,
+    
+    menuCommand = "pumpkins",
+    menuKey = "F7",
+    
+    spawnInterval = 300000, -- 5 minutes
+    maxActivePumpkins = 30, -- Total on map
+    despawnTime = 600000, -- 10 minutes
+    
+    interactionDistance = 2.5,
+    showDistance = 15.0,
+    
+    notifications = {
+        collected = "🎃 ¡Has encontrado una calabaza! (%d/%d)",
+        alreadyCollected = "Esta calabaza ya fue recogida",
+        rewardUnlocked = "🏆 ¡Has desbloqueado una recompensa!",
+        eventNotActive = "El evento de Halloween no está activo",
+        menuOpened = "Menú de calabazas abierto",
+    },
+    
+    models = {
+        "prop_veg_crop_03_pump",
+        "m23_1_prop_m31_stack_pk_01a",
+        "m23_1_prop_m31_stack_pk_01b",
+    },
+    
+    collectEffects = {
+        particle = true,
+        particleDict = "core",
+        particleName = "ent_dst_elec_fire_sp",
+        particleDuration = 2000,
+        
+        sound = true,
+        soundName = "PICK_UP",
+        soundSet = "HUD_FRONTEND_DEFAULT_SOUNDSET",
+        
+        screenEffect = true,
+        screenEffectName = "HeistCelebPass",
+        screenEffectDuration = 1000,
+    },
+    
+    spawnZones = {
+        {
+            name = "Centro de Los Santos",
+            center = vector3(200.0, -800.0, 31.0),
+            radius = 300.0,
+            maxPumpkins = 10,
+        },
+        {
+            name = "Grove Street",
+            center = vector3(100.0, -1900.0, 21.0),
+            radius = 300.0,
+            maxPumpkins = 5,
+        },
+        {
+            name = "Playa de Vespucci",
+            center = vector3(-1500.0, -1000.0, 5.0),
+            radius = 400.0,
+            maxPumpkins = 8,
+        },
+        {
+            name = "Vinewood Hills",
+            center = vector3(750.0, 1200.0, 300.0),
+            radius = 600.0,
+            maxPumpkins = 7,
+        },
+        {
+            name = "Sandy Shores",
+            center = vector3(1850.0, 3700.0, 34.0),
+            radius = 500.0,
+            maxPumpkins = 6,
+        },
+        {
+            name = "Paleto Bay",
+            center = vector3(-300.0, 6300.0, 32.0),
+            radius = 400.0,
+            maxPumpkins = 5,
+        },
+    },
+    
+    rewards = {
+        {
+            pumpkinsRequired = 5,
+            name = "Cazador Novato",
+            description = "Encuentra 5 calabazas",
+            icon = "🎃",
+            rewards = {
+                { type = "money", amount = 5000 },
+                { type = "item", name = "water", amount = 5 },
+            }
+        },
+        {
+            pumpkinsRequired = 15,
+            name = "Cazador Experimentado",
+            description = "Encuentra 15 calabazas",
+            icon = "🎃🎃",
+            rewards = {
+                { type = "money", amount = 15000 },
+                { type = "item", name = "bread", amount = 10 },
+                { type = "item", name = "bandage", amount = 3 },
+            }
+        },
+        {
+            pumpkinsRequired = 30,
+            name = "Maestro de Halloween",
+            description = "Encuentra 30 calabazas",
+            icon = "🎃🎃🎃",
+            rewards = {
+                { type = "money", amount = 30000 },
+                { type = "item", name = "lockpick", amount = 5 },
+                { type = "weapon", name = "WEAPON_KNIFE", ammo = 0 },
+            }
+        },
+        {
+            pumpkinsRequired = 50,
+            name = "Leyenda de las Calabazas",
+            description = "Encuentra 50 calabazas",
+            icon = "👑🎃",
+            rewards = {
+                { type = "money", amount = 50000 },
+                { type = "black_money", amount = 10000 },
+                { type = "item", name = "radio", amount = 1 },
+            }
+        },
+        {
+            pumpkinsRequired = 100,
+            name = "Rey de Halloween",
+            description = "Encuentra 100 calabazas - ¡Completado!",
+            icon = "🏆👑🎃",
+            rewards = {
+                { type = "money", amount = 100000 },
+                { type = "black_money", amount = 50000 },
+                { type = "item", name = "halloween_mask", amount = 1 },
+                { type = "weapon", name = "WEAPON_MACHETE", ammo = 0 },
+            }
+        },
+    },
+    
+    marker = {
+        type = 2,
+        scale = vector3(0.5, 0.5, 0.5),
+        color = { r = 255, g = 140, b = 0, a = 200 },
+        bobUpAndDown = true,
+        faceCamera = true,
+        rotate = true,
+        drawOnEnts = false,
+    },
+    
+    text3D = {
+        enabled = true,
+        distance = 5.0,
+        text = "~g~[E]~w~ Recoger calabaza",
+        scale = 0.35,
+    },
+    
+    leaderboard = {
+        enabled = true,
+        showInMenu = true,
+        topPlayersCount = 10,
+        updateInterval = 60000,
+    },
+    
+    statistics = {
+        trackCollectionTime = true,
+        trackCollectionLocation = true,
+        showPersonalStats = true,
+    },
+    
+    framework = {
+        esx = {
+            moneyAccount = "money",
+            blackMoneyAccount = "black_money", 
+        },
+        qb = {
+            moneyType = "cash",
+            blackMoneyType = "black_money",
+        },
+    },
+    
+    database = {
+        tableName = "pumpkin_hunt_data",
+        autoCreateTable = true,
+        saveInterval = 30000,
+    },
+    
+    animations = {
+        collect = {
+            dict = "pickup_object",
+            anim = "pickup_low",
+            duration = 1000,
+            flag = 1,
+        },
+    },
+}

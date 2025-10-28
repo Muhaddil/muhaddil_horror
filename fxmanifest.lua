@@ -3,7 +3,7 @@ game 'gta5'
 
 author 'Muhaddil'
 description 'Horror System for FiveM'
-version '0.1.0'
+version '0.2.0'
 
 dependencies {
     'PolyZone'
@@ -24,7 +24,8 @@ client_scripts {
 }
 
 server_scripts {
-    'server/*'
+    'server/*',
+    '@oxmysql/lib/MySQL.lua',
 }
 
 ui_page 'web/index.html'

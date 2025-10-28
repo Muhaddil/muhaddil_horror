@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Horror System</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="pumpkin.css">
 </head>
 <body>
     <div id="app">
@@ -33,10 +34,159 @@
         
         <div id="blindness-overlay" class="hidden"></div>
 
+        <div id="pumpkin-menu" class="hidden">
+            <button class="close-btn" onclick="closePumpkinMenu()">×</button>
+            
+            <div class="menu-header">
+                <h1>🎃 CAZA DE CALABAZAS 🎃</h1>
+                <p class="subtitle">Evento Especial de Halloween</p>
+            </div>
+
+            <div class="menu-tabs">
+                <div class="tab active" data-tab="overview">📊 Resumen</div>
+                <div class="tab" data-tab="rewards">🏆 Recompensas</div>
+                <div class="tab" data-tab="leaderboard">👑 Ranking</div>
+                <div class="tab" data-tab="info">ℹ️ Info</div>
+            </div>
+
+            <div class="menu-content">
+                <div id="tab-overview" class="tab-content active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="icon">🎃</div>
+                            <div class="value" id="total-collected">0</div>
+                            <div class="label">Calabazas Encontradas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">🏆</div>
+                            <div class="value" id="rewards-claimed">0</div>
+                            <div class="label">Recompensas Obtenidas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">👑</div>
+                            <div class="value" id="player-rank">-</div>
+                            <div class="label">Tu Posición</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">📍</div>
+                            <div class="value" id="active-pumpkins">0</div>
+                            <div class="label">Calabazas Activas</div>
+                        </div>
+                    </div>
+
+                    <div class="progress-section">
+                        <div class="progress-title">Progreso Hasta Siguiente Recompensa</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="next-reward-progress" style="width: 0%">
+                                <span id="progress-text">0 / 0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-mini">
+                        <div class="stat-mini-item">
+                            <div class="stat-mini-value" id="total-players">0</div>
+                            <div class="stat-mini-label">Jugadores Participando</div>
+                        </div>
+                        <div class="stat-mini-item">
+                            <div class="stat-mini-value" id="total-collected-global">0</div>
+                            <div class="stat-mini-label">Total Recolectado</div>
+                        </div>
+                        <div class="stat-mini-item">
+                            <div class="stat-mini-value" id="time-remaining">--:--:--</div>
+                            <div class="stat-mini-label">Tiempo Restante</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-rewards" class="tab-content">
+                    <div class="progress-section">
+                        <div class="progress-title">Tu Progreso Total</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="total-progress" style="width: 0%">
+                                <span id="total-progress-text">0 / 100</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rewards-list" id="rewards-container">
+                        <!-- Las recompensas se cargarán dinámicamente aquí -->
+                    </div>
+                </div>
+
+                <div id="tab-leaderboard" class="tab-content">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Posición</th>
+                                <th>Jugador</th>
+                                <th style="width: 150px; text-align: center;">Calabazas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <tr>
+                                <td colspan="3">
+                                    <div class="empty-state">
+                                        <div class="icon">👻</div>
+                                        <div class="text">Cargando ranking...</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="tab-info" class="tab-content">
+                    <div class="info-panel">
+                        <h3>📖 ¿Cómo Jugar?</h3>
+                        <p>
+                            Las calabazas aparecen aleatoriamente por todo el mapa cada ciertos minutos.
+                            Cuando veas una calabaza con un marcador naranja, acércate y presiona <strong>[E]</strong> para recogerla.
+                        </p>
+                    </div>
+
+                    <div class="info-panel">
+                        <h3>🏆 Sistema de Recompensas</h3>
+                        <p>
+                            Cada vez que alcances un hito de calabazas recolectadas, desbloquearás recompensas especiales.
+                            Las recompensas incluyen dinero, items y armas únicas de Halloween.
+                        </p>
+                    </div>
+
+                    <div class="info-panel">
+                        <h3>👑 Ranking</h3>
+                        <p>
+                            Compite con otros jugadores para ser el Rey de Halloween. Los mejores cazadores de calabazas
+                            aparecerán en el ranking global. ¡Demuestra que eres el mejor!
+                        </p>
+                    </div>
+
+                    <div class="info-panel">
+                        <h3>⏰ Duración del Evento</h3>
+                        <p id="event-duration">
+                            El evento está activo desde el <strong id="start-date">--/--/----</strong> 
+                            hasta el <strong id="end-date">--/--/----</strong>.
+                        </p>
+                    </div>
+
+                    <div class="info-panel">
+                        <h3>💡 Consejos</h3>
+                        <p>
+                            • Las calabazas desaparecen después de un tiempo, ¡date prisa!<br>
+                            • Explora diferentes zonas para encontrar más calabazas<br>
+                            • Revisa el mapa regularmente para nuevas calabazas<br>
+                            • Reclama tus recompensas en la pestaña de Recompensas
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <audio id="horror-audio" preload="auto"></audio>
     </div>
     
     <script src="sounds.js"></script>
     <script src="app.js"></script>
+    <script src="pumpkin.js"></script>
 </body>
-</html>
+</htm
