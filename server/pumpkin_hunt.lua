@@ -66,7 +66,7 @@ CreateThread(function()
                 last_collection_location VARCHAR(200),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
+            ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
         ]], {}, function(result)
             print("^2[PUMPKIN HUNT]^7 Tabla de base de datos creada/verificada")
         end)
