@@ -283,7 +283,7 @@ local function GenerateRandomPosition(zone)
             local closestPlayer = nearbyPlayers[1].id
 
             if Config.DebugMode then
-                print(string.format("^6[PUMPKIN]^7 Jugador más cercano: %d a %.1fm de (%.2f, %.2f)", 
+                print(string.format("^6[PUMPKIN]^7 Jugador más cercano: %d a %.1fm de (%.2f, %.2f)",
                     closestPlayer, nearbyPlayers[1].distance, x, y))
             end
 
@@ -294,7 +294,7 @@ local function GenerateRandomPosition(zone)
             if ok and res then
                 position = vector3(x, y, res.z)
                 if Config.DebugMode then
-                    print(string.format("^2[PUMPKIN]^7 Posición válida encontrada en intento %d: (%.2f, %.2f, %.2f)", 
+                    print(string.format("^2[PUMPKIN]^7 Posición válida encontrada en intento %d: (%.2f, %.2f, %.2f)",
                         i, position.x, position.y, position.z))
                 end
                 break
@@ -337,18 +337,18 @@ local function SpawnPumpkin(zoneIndex)
     local playersInZone = false
     local players = GetPlayers()
     local zoneCenter = vector3(zone.center.x, zone.center.y, zone.center.z)
-    
+
     for _, playerId in ipairs(players) do
         local playerPed = GetPlayerPed(playerId)
         local playerCoords = GetEntityCoords(playerPed)
         local distanceToZone = #(zoneCenter - playerCoords)
-        
+
         if distanceToZone < (zone.radius + 100.0) then
             playersInZone = true
             break
         end
     end
-    
+
     if not playersInZone then
         if Config.DebugMode then
             print(string.format("^3[PUMPKIN]^7 No hay jugadores en zona %s - omitiendo spawn", zone.name))
@@ -520,6 +520,40 @@ local function SyncPumpkinsToPlayer(source)
     end
 end
 
+local function SpawnPumpkinIfNone(source)
+    if CountActivePumpkins() == 0 then
+        local playerPed = GetPlayerPed(source)
+        local playerCoords = GetEntityCoords(playerPed)
+
+        local closestZoneIndex = nil
+        local closestDistance = math.huge
+
+        for i, zone in ipairs(Config.PumpkinHunt.spawnZones) do
+            local zoneCenter = vector3(zone.center.x, zone.center.y, zone.center.z)
+            local dist = #(playerCoords - zoneCenter)
+            if dist < closestDistance then
+                closestDistance = dist
+                closestZoneIndex = i
+            end
+        end
+
+        if closestZoneIndex then
+            local zone = Config.PumpkinHunt.spawnZones[closestZoneIndex]
+            local initialSpawns = math.floor(zone.maxPumpkins / 2)
+
+            for i = 1, initialSpawns do
+                SpawnPumpkin(closestZoneIndex)
+                Wait(500)
+            end
+
+            if Config.DebugMode then
+                print(string.format("^2[PUMPKIN]^7 Primer jugador %s entró y no había calabazas. Spawneadas %d calabazas en zona %d",
+                    GetPlayerName(source), initialSpawns, closestZoneIndex))
+            end
+        end
+    end
+end
+
 if FrameWork == 'esx' then
     AddEventHandler('esx:playerLoaded', function(playerId, xPlayer, isNew)
         local source = playerId
@@ -531,6 +565,7 @@ if FrameWork == 'esx' then
                 if data then
                     playerPumpkinData[source] = data
 
+                    SpawnPumpkinIfNone(source)
                     SyncPumpkinsToPlayer(source)
 
                     if Config.PumpkinHunt.leaderboard.enabled then
@@ -557,6 +592,7 @@ else
             if data then
                 playerPumpkinData[source] = data
 
+                SpawnPumpkinIfNone(source)
                 SyncPumpkinsToPlayer(source)
 
                 if Config.PumpkinHunt.leaderboard.enabled then
@@ -1009,14 +1045,22 @@ RegisterCommand('pumpkinadmin', function(source, args)
     elseif action == "list" then
         if next(activePumpkins) == nil then
             local msg = "^1No hay calabazas activas actualmente.^7"
-            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                    { args = { "[PUMPKIN]", msg } }) end
+            if source == 0 then
+                print(msg)
+            else
+                TriggerClientEvent('chat:addMessage', source,
+                    { args = { "[PUMPKIN]", msg } })
+            end
             return
         end
 
         local msgHeader = "^3=== COORDENADAS DE CALABAZAS ACTIVAS ===^7"
-        if source == 0 then print(msgHeader) else TriggerClientEvent('chat:addMessage', source,
-                { args = { "[PUMPKIN]", msgHeader } }) end
+        if source == 0 then
+            print(msgHeader)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[PUMPKIN]", msgHeader } })
+        end
 
         for id, data in pairs(activePumpkins) do
             if not data.collected then
@@ -1032,8 +1076,12 @@ RegisterCommand('pumpkinadmin', function(source, args)
 
         local msgFooter = string.format("^3Total activas: %d/%d^7", CountActivePumpkins(),
             Config.PumpkinHunt.maxActivePumpkins)
-        if source == 0 then print(msgFooter) else TriggerClientEvent('chat:addMessage', source,
-                { args = { "[PUMPKIN]", msgFooter } }) end
+        if source == 0 then
+            print(msgFooter)
+        else
+            TriggerClientEvent('chat:addMessage', source,
+                { args = { "[PUMPKIN]", msgFooter } })
+        end
     elseif action == "reset" then
         local targetId = tonumber(args[2])
         if not targetId or not GetPlayerName(targetId) then
