@@ -23,7 +23,7 @@ end
 
 local function DrawText3D(coords, text)
     local onScreen, x, y = World3dToScreen2d(coords.x, coords.y, coords.z)
-    
+
     if onScreen then
         SetTextScale(Config.PumpkinHunt.text3D.scale, Config.PumpkinHunt.text3D.scale)
         SetTextFont(4)
@@ -33,7 +33,7 @@ local function DrawText3D(coords, text)
         SetTextCentre(true)
         AddTextComponentString(text)
         DrawText(x, y)
-        
+
         local factor = (string.len(text)) / 370
         DrawRect(x, y + 0.0125, 0.015 + factor, 0.03, 0, 0, 0, 75)
     end
@@ -77,7 +77,7 @@ local function PlayCollectEffects(coords)
         while not HasNamedPtfxAssetLoaded(Config.PumpkinHunt.collectEffects.particleDict) do
             Wait(0)
         end
-        
+
         UseParticleFxAssetNextCall(Config.PumpkinHunt.collectEffects.particleDict)
         StartParticleFxNonLoopedAtCoord(
             Config.PumpkinHunt.collectEffects.particleName,
@@ -103,7 +103,7 @@ local function PlayCollectEffects(coords)
             0,
             false
         )
-        
+
         SetTimeout(Config.PumpkinHunt.collectEffects.screenEffectDuration, function()
             StopScreenEffect(Config.PumpkinHunt.collectEffects.screenEffectName)
         end)
@@ -130,6 +130,8 @@ AddEventHandler('pumpkin:spawn', function(pumpkinId, position, model)
     SetEntityCollision(obj, false, false)
 
     activePumpkins[pumpkinId].object = obj
+    local objCoords = GetEntityCoords(obj)
+    activePumpkins[pumpkinId].position = objCoords
 
     if Config.DebugMode then
         print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en cliente", pumpkinId))
@@ -138,12 +140,13 @@ end)
 
 RegisterNetEvent('pumpkin:remove')
 AddEventHandler('pumpkin:remove', function(pumpkinId)
-    if activePumpkins[pumpkinId] then
-        if DoesEntityExist(activePumpkins[pumpkinId].object) then
-            DeleteObject(activePumpkins[pumpkinId].object)
-        end
-        activePumpkins[pumpkinId] = nil
+    local pumpkin = activePumpkins[pumpkinId]
+    if pumpkin and pumpkin.object and DoesEntityExist(pumpkin.object) then
+        NetworkRequestControlOfEntity(pumpkin.object)
+        SetEntityAsMissionEntity(pumpkin.object, true, true)
+        DeleteEntity(pumpkin.object)
     end
+    activePumpkins[pumpkinId] = nil
 end)
 
 RegisterNetEvent('pumpkin:syncAll')
@@ -184,7 +187,7 @@ CreateThread(function()
 
         for id, pumpkin in pairs(activePumpkins) do
             local distance = #(playerCoords - pumpkin.position)
-            
+
             if distance <= Config.PumpkinHunt.showDistance then
                 sleep = 0
                 table.insert(nearbyPumpkins, {
@@ -193,8 +196,8 @@ CreateThread(function()
                     position = pumpkin.position,
                     object = pumpkin.object
                 })
-                
-                if distance <= 20.0 and not notifiedPumpkins[id] then
+
+                if distance <= Config.PumpkinHunt.warningNotificationDistance and not notifiedPumpkins[id] then
                     lib.notify({
                         title = "¡Cuidado!",
                         description = "Hay una calabaza cerca.",
@@ -203,7 +206,7 @@ CreateThread(function()
                     notifiedPumpkins[id] = true
                 end
 
-                if distance > 500.0 and notifiedPumpkins[id] then
+                if distance > Config.PumpkinHunt.notificationResetDistance and notifiedPumpkins[id] then
                     notifiedPumpkins[id] = nil
                 end
             end
@@ -230,7 +233,7 @@ CreateThread(function()
                     Config.PumpkinHunt.marker.type,
                     pumpkin.position.x,
                     pumpkin.position.y,
-                    pumpkin.position.z + 1.5,
+                    pumpkin.position.z,
                     0.0, 0.0, 0.0,
                     0.0, 0.0, 0.0,
                     Config.PumpkinHunt.marker.scale.x,
@@ -337,7 +340,7 @@ function OpenPumpkinMenu()
 
         menuOpen = true
         SetNuiFocus(true, true)
-        
+
         SendNUIMessage({
             type = 'openPumpkinMenu',
             data = result
@@ -373,7 +376,6 @@ RegisterNUICallback('claimPumpkinReward', function(data, cb)
         else
             ShowNotification(result.message, "error")
         end
-   
     end, data.pumpkinsRequired)
     cb('ok')
 end)
@@ -396,7 +398,7 @@ AddEventHandler('onResourceStop', function(resourceName)
                 DeleteObject(pumpkin.object)
             end
         end
-        
+
         if menuOpen then
             SetNuiFocus(false, false)
         end
@@ -419,8 +421,18 @@ lib.callback.register('pumpkin:getGroundZ', function(coords)
         return vector3(0, 0, 0)
     end
 
-    local x, y, z = coords.x, coords.y, coords.z + 50.0
-    local found, groundZ = GetGroundZFor_3dCoord(x, y, z, false)
-    if not found then groundZ = z end
-    return vector3(x, y, groundZ)
+    local x, y = coords.x, coords.y
+    local foundGround, groundZ = false, 0.0
+
+    for i = 1, 10 do
+        local testZ = coords.z + (100.0 - (i * 10.0))
+        foundGround, groundZ = GetGroundZFor_3dCoord(x, y, testZ, true)
+        if foundGround then
+            return vector3(x, y, groundZ)
+        end
+        Wait(5)
+    end
+
+    print("^3[WARN]^7 No se encontró suelo en (" .. x .. ", " .. y .. ") usando Z=" .. coords.z)
+    return vector3(x, y, coords.z)
 end)

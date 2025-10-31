@@ -22,6 +22,26 @@ else
     print('===NO SUPPORTED FRAMEWORK FOUND===')
 end
 
+local function CountActivePumpkins()
+    local count = 0
+    for id, pumpkin in pairs(activePumpkins) do
+        if not pumpkin.collected then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function CountPumpkinsInZone(zoneIndex)
+    local count = 0
+    for _, pumpkin in pairs(activePumpkins) do
+        if pumpkin.zone == zoneIndex and not pumpkin.collected then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function HasAdminPermission(source)
     local src = source
     if FrameWork == 'qb' then
@@ -226,8 +246,6 @@ local function IsEventActive()
     local startDate = Config.PumpkinHunt.eventStartDate
     local endDate = Config.PumpkinHunt.eventEndDate
 
-    print(currentDate >= startDate and currentDate <= endDate)
-
     return currentDate >= startDate and currentDate <= endDate
 end
 
@@ -248,21 +266,23 @@ local function GenerateRandomPosition(zone)
 end
 
 local function SpawnPumpkin(zoneIndex)
-    if #activePumpkins >= Config.PumpkinHunt.maxActivePumpkins then
+    if CountActivePumpkins() >= Config.PumpkinHunt.maxActivePumpkins then
+        if Config.DebugMode then
+            print(string.format("^3[PUMPKIN]^7 Límite global alcanzado (%d/%d)", 
+                CountActivePumpkins(), Config.PumpkinHunt.maxActivePumpkins))
+        end
         return
     end
 
     local zone = Config.PumpkinHunt.spawnZones[zoneIndex]
     if not zone then return end
 
-    local zoneCount = 0
-    for _, pumpkin in pairs(activePumpkins) do
-        if pumpkin.zone == zoneIndex then
-            zoneCount = zoneCount + 1
-        end
-    end
-
+    local zoneCount = CountPumpkinsInZone(zoneIndex)
     if zoneCount >= zone.maxPumpkins then
+        if Config.DebugMode then
+            print(string.format("^3[PUMPKIN]^7 Límite de zona alcanzado en %s (%d/%d)", 
+                zone.name, zoneCount, zone.maxPumpkins))
+        end
         return
     end
 
@@ -285,7 +305,8 @@ local function SpawnPumpkin(zoneIndex)
     TriggerClientEvent('pumpkin:spawn', -1, pumpkinId, position, model)
 
     if Config.DebugMode then
-        print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en %s", pumpkinId, zone.name))
+        print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en %s (Total: %d)", 
+            pumpkinId, zone.name, CountActivePumpkins()))
     end
 
     SetTimeout(Config.PumpkinHunt.despawnTime, function()
@@ -306,7 +327,8 @@ CreateThread(function()
     Wait(5000)
 
     for i = 1, #Config.PumpkinHunt.spawnZones do
-        for j = 1, math.floor(Config.PumpkinHunt.spawnZones[i].maxPumpkins / 2) do
+        local initialSpawns = math.floor(Config.PumpkinHunt.spawnZones[i].maxPumpkins / 2)
+        for j = 1, initialSpawns do
             SpawnPumpkin(i)
             Wait(500)
         end
@@ -347,23 +369,105 @@ CreateThread(function()
     end
 end)
 
-AddEventHandler('playerJoining', function()
-    local source = source
-    Wait(2000)
-
+local function SyncPumpkinsToPlayer(source)
     if not Config.PumpkinHunt.enabled then return end
 
-    LoadPlayerData(source, function(data)
-        if data then
-            playerPumpkinData[source] = data
+    local activeCount = CountActivePumpkins()
 
-            TriggerClientEvent('pumpkin:syncAll', source, activePumpkins)
-
-            if Config.PumpkinHunt.leaderboard.enabled then
-                TriggerClientEvent('pumpkin:updateLeaderboard', source, leaderboardCache)
-            end
+    if activeCount == 0 then
+        if Config.DebugMode then
+            print(string.format("^3[PUMPKIN]^7 No hay calabazas activas para sincronizar a %s", GetPlayerName(source)))
         end
+        return
+    end
+
+    for id, pumpkin in pairs(activePumpkins) do
+        if not pumpkin.collected then
+            TriggerClientEvent('pumpkin:spawn', source, id, pumpkin.position, pumpkin.model)
+        end
+    end
+
+    if Config.DebugMode then
+        print(string.format("^2[PUMPKIN]^7 Sincronizadas %d calabazas a %s",
+            activeCount, GetPlayerName(source)))
+    end
+end
+
+if FrameWork == 'esx' then
+    AddEventHandler('esx:playerLoaded', function(playerId, xPlayer, isNew)
+        local source = playerId
+
+        if not Config.PumpkinHunt.enabled then return end
+
+        SetTimeout(2000, function()
+            LoadPlayerData(source, function(data)
+                if data then
+                    playerPumpkinData[source] = data
+
+                    SyncPumpkinsToPlayer(source)
+
+                    if Config.PumpkinHunt.leaderboard.enabled then
+                        TriggerClientEvent('pumpkin:updateLeaderboard', source, leaderboardCache)
+                    end
+
+                    if Config.DebugMode then
+                        local status = isNew and "NUEVO" or "EXISTENTE"
+                        print(string.format("^2[PUMPKIN]^7 Jugador %s cargado [%s]: %d calabazas recolectadas",
+                            xPlayer.getName(), status, data.collected))
+                    end
+                end
+            end)
+        end)
     end)
+else
+    AddEventHandler('playerJoining', function()
+        local source = source
+        Wait(2000)
+
+        if not Config.PumpkinHunt.enabled then return end
+
+        LoadPlayerData(source, function(data)
+            if data then
+                playerPumpkinData[source] = data
+
+                SyncPumpkinsToPlayer(source)
+
+                if Config.PumpkinHunt.leaderboard.enabled then
+                    TriggerClientEvent('pumpkin:updateLeaderboard', source, leaderboardCache)
+                end
+
+                if Config.DebugMode then
+                    print(string.format("^2[PUMPKIN]^7 Datos cargados para %s: %d calabazas",
+                        GetPlayerName(source), data.collected))
+                end
+            end
+        end)
+    end)
+end
+
+RegisterCommand('pumpkinresync', function(source, args)
+    if source == 0 then return end
+
+    if not Config.PumpkinHunt.enabled then
+        TriggerClientEvent('chat:addMessage', source, {
+            args = { "[PUMPKIN]", "Sistema desactivado" }
+        })
+        return
+    end
+
+    TriggerClientEvent('pumpkin:clearAll', source)
+
+    SetTimeout(500, function()
+        SyncPumpkinsToPlayer(source)
+        TriggerClientEvent('chat:addMessage', source, {
+            color = { 0, 255, 0 },
+            args = { "[PUMPKIN]", string.format("Resincronizadas %d calabazas", CountActivePumpkins()) }
+        })
+    end)
+end, false)
+
+exports('ResyncPlayerPumpkins', function(source)
+    SyncPumpkinsToPlayer(source)
 end)
 
 AddEventHandler('playerDropped', function()
@@ -436,7 +540,7 @@ lib.callback.register('pumpkin:openMenu', function(source)
         },
         rewards = Config.PumpkinHunt.rewards,
         leaderboard = leaderboardCache,
-        activePumpkins = #activePumpkins,
+        activePumpkins = CountActivePumpkins(),
         totalPlayers = globalStats.totalPlayers,
         totalCollectedGlobal = globalStats.totalCollected,
         timeRemaining = timeRemaining,
@@ -455,15 +559,19 @@ lib.callback.register('pumpkin:collect', function(source, pumpkinId)
     end
 
     local pumpkin = activePumpkins[pumpkinId]
-    if not pumpkin or pumpkin.collected then
+    if not pumpkin then
+        return { success = false, message = Config.PumpkinHunt.notifications.alreadyCollected }
+    end
+
+    if pumpkin.collected then
         return { success = false, message = Config.PumpkinHunt.notifications.alreadyCollected }
     end
 
     pumpkin.collected = true
-    activePumpkins[pumpkinId] = nil
 
     local identifier = GetPlayerIdentifier(source)
     if not identifier then
+        activePumpkins[pumpkinId] = nil
         return { success = false, message = "Error cargando datos" }
     end
 
@@ -511,8 +619,17 @@ lib.callback.register('pumpkin:collect', function(source, pumpkinId)
     end
 
     playerPumpkinData[source] = data
+
+    activePumpkins[pumpkinId] = nil
+
     TriggerClientEvent('pumpkin:remove', -1, pumpkinId)
+
     UpdateLeaderboard()
+
+    if Config.DebugMode then
+        print(string.format("^2[PUMPKIN]^7 %s recolectó calabaza #%d (Total: %d/%d activas)", 
+            GetPlayerName(source), pumpkinId, CountActivePumpkins(), Config.PumpkinHunt.maxActivePumpkins))
+    end
 
     local newRewards = {}
     for _, reward in ipairs(Config.PumpkinHunt.rewards) do
@@ -707,6 +824,7 @@ RegisterCommand('pumpkinadmin', function(source, args)
 /pumpkinadmin reset [id] - Resetear progreso
 /pumpkinadmin give [id] [cantidad] - Dar calabazas
 /pumpkinadmin info - Info del sistema
+/pumpkinadmin list - Mostrar coordenadas de calabazas activas
 ^3================================^7
         ]]
 
@@ -726,6 +844,7 @@ RegisterCommand('pumpkinadmin', function(source, args)
 
         local msg = string.format("^2Calabaza spawneada en zona %d^7", zoneIndex)
         if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } }) end
+    
     elseif action == "clear" then
         local count = 0
         for id, _ in pairs(activePumpkins) do
@@ -736,12 +855,16 @@ RegisterCommand('pumpkinadmin', function(source, args)
 
         local msg = string.format("^2Limpiadas %d calabazas^7", count)
         if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } }) end
+    
     elseif action == "stats" then
         local targetId = tonumber(args[2])
         if not targetId or not GetPlayerName(targetId) then
             local msg = "Jugador no encontrado"
-            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                    { args = { "[PUMPKIN]", msg } }) end
+            if source == 0 then
+                print(msg)
+            else
+                TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } })
+            end
             return
         end
 
@@ -751,16 +874,48 @@ RegisterCommand('pumpkinadmin', function(source, args)
                     "^3%s^7: %d calabazas | %d recompensas reclamadas",
                     GetPlayerName(targetId), data.collected, #data.rewardsClaimed
                 )
-                if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                        { args = { "[PUMPKIN]", msg } }) end
+                if source == 0 then
+                    print(msg)
+                else
+                    TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } })
+                end
             end
         end)
+    
+    elseif action == "list" then
+        if next(activePumpkins) == nil then
+            local msg = "^1No hay calabazas activas actualmente.^7"
+            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } }) end
+            return
+        end
+
+        local msgHeader = "^3=== COORDENADAS DE CALABAZAS ACTIVAS ===^7"
+        if source == 0 then print(msgHeader) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msgHeader } }) end
+
+        for id, data in pairs(activePumpkins) do
+            if not data.collected then
+                local coords = string.format("ID %d: (x=%.2f, y=%.2f, z=%.2f) - %s", 
+                    id, data.position.x, data.position.y, data.position.z, data.zoneName)
+                if source == 0 then
+                    print(coords)
+                else
+                    TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", coords } })
+                end
+            end
+        end
+
+        local msgFooter = string.format("^3Total activas: %d/%d^7", CountActivePumpkins(), Config.PumpkinHunt.maxActivePumpkins)
+        if source == 0 then print(msgFooter) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msgFooter } }) end
+    
     elseif action == "reset" then
         local targetId = tonumber(args[2])
         if not targetId or not GetPlayerName(targetId) then
             local msg = "Jugador no encontrado"
-            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                    { args = { "[PUMPKIN]", msg } }) end
+            if source == 0 then
+                print(msg)
+            else
+                TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } })
+            end
             return
         end
 
@@ -779,18 +934,25 @@ RegisterCommand('pumpkinadmin', function(source, args)
                 end
 
                 local msg = string.format("^2Progreso reseteado para %s^7", GetPlayerName(targetId))
-                if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                        { args = { "[PUMPKIN]", msg } }) end
+                if source == 0 then
+                    print(msg)
+                else
+                    TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } })
+                end
             end)
         end
+    
     elseif action == "give" then
         local targetId = tonumber(args[2])
         local amount = tonumber(args[3]) or 1
 
         if not targetId or not GetPlayerName(targetId) then
             local msg = "Jugador no encontrado"
-            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                    { args = { "[PUMPKIN]", msg } }) end
+            if source == 0 then
+                print(msg)
+            else
+                TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } })
+            end
             return
         end
 
@@ -802,10 +964,14 @@ RegisterCommand('pumpkinadmin', function(source, args)
 
                 local msg = string.format("^2Dadas %d calabazas a %s (Total: %d)^7",
                     amount, GetPlayerName(targetId), data.collected)
-                if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
-                        { args = { "[PUMPKIN]", msg } }) end
+                if source == 0 then
+                    print(msg)
+                else
+                    TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } })
+                end
             end
         end)
+    
     elseif action == "info" then
         local msg = string.format([[
 ^3=== INFO SISTEMA CALABAZAS ===^7
@@ -815,7 +981,7 @@ Evento activo: %s
 Jugadores con datos: %d
 ^3==============================^7
         ]],
-            #activePumpkins,
+            CountActivePumpkins(),
             Config.PumpkinHunt.maxActivePumpkins,
             #Config.PumpkinHunt.spawnZones,
             IsEventActive() and "Sí" or "No",
@@ -835,6 +1001,13 @@ AddEventHandler('onResourceStop', function(resourceName)
     end
 end)
 
+AddEventHandler('onResourceStart', function(resourceName)
+    if (GetCurrentResourceName() ~= resourceName) then
+        return
+    end
+    UpdateLeaderboard()
+end)
+
 exports('GetPlayerPumpkins', function(source)
     return playerPumpkinData[source] and playerPumpkinData[source].collected or 0
 end)
@@ -843,13 +1016,10 @@ exports('GetActivePumpkins', function()
     return activePumpkins
 end)
 
+exports('GetActivePumpkinsCount', function()
+    return CountActivePumpkins()
+end)
+
 exports('SpawnPumpkin', SpawnPumpkin)
 
 exports('IsEventActive', IsEventActive)
-
-AddEventHandler('onResourceStart', function(resourceName)
-  if (GetCurrentResourceName() ~= resourceName) then
-    return
-  end
-  UpdateLeaderboard()
-end)

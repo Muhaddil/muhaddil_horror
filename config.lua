@@ -310,7 +310,9 @@ Config.PumpkinHunt = {
     
     interactionDistance = 2.5,
     showDistance = 15.0,
-    
+    warningNotificationDistance = 30.0,
+    notificationResetDistance = 500.0,
+
     notifications = {
         collected = "🎃 ¡Has encontrado una calabaza! (%d/%d)",
         alreadyCollected = "Esta calabaza ya fue recogida",
