@@ -251,18 +251,42 @@ end
 
 local function GenerateRandomPosition(zone)
     local players = GetPlayers()
-    if #players == 0 then return end
+    if #players == 0 then return nil end
 
     local anyPlayer = tonumber(players[1])
-    local angle = math.random() * 2 * math.pi
-    local distance = math.random() * zone.radius
+    local tries = 10
+    for i = 1, tries do
+        local angle = math.random() * 2 * math.pi
+        local distance = math.random() * zone.radius
 
-    local x = zone.center.x + math.cos(angle) * distance
-    local y = zone.center.y + math.sin(angle) * distance
-    local z = zone.center.z
+        local x = zone.center.x + math.cos(angle) * distance
+        local y = zone.center.y + math.sin(angle) * distance
+        local z = zone.center.z
 
-    local position = lib.callback.await('pumpkin:getGroundZ', anyPlayer, vector3(x, y, z))
-    return position
+        local position = nil
+        local ok, res = pcall(function()
+            return lib.callback.await('pumpkin:getGroundZ', anyPlayer, vector3(x, y, z))
+        end)
+        if ok then
+            position = res
+        else
+            position = nil
+        end
+
+        if position then
+            return vector3(x, y, position.z or z)
+        else
+            if Config.DebugMode then
+                print(string.format("^3[PUMPKIN]^7 GenerateRandomPosition intento %d fallido en zona %s (x=%.2f y=%.2f)", i, zone.name or zoneIndex, x, y))
+            end
+            Wait(10)
+        end
+    end
+
+    if Config.DebugMode then
+        print(string.format("^1[PUMPKIN]^7 No se obtuvo groundZ en zona %s; usando center as fallback.", zone.name or "unknown"))
+    end
+    return vector3(zone.center.x, zone.center.y, zone.center.z)
 end
 
 local function SpawnPumpkin(zoneIndex)
@@ -275,7 +299,10 @@ local function SpawnPumpkin(zoneIndex)
     end
 
     local zone = Config.PumpkinHunt.spawnZones[zoneIndex]
-    if not zone then return end
+    if not zone then
+        if Config.DebugMode then print("^1[PUMPKIN]^7 SpawnPumpkin: zona inválida: " .. tostring(zoneIndex)) end
+        return
+    end
 
     local zoneCount = CountPumpkinsInZone(zoneIndex)
     if zoneCount >= zone.maxPumpkins then
@@ -286,10 +313,16 @@ local function SpawnPumpkin(zoneIndex)
         return
     end
 
+    local position = GenerateRandomPosition(zone)
+    if not position then
+        if Config.DebugMode then
+            print(string.format("^1[PUMPKIN]^7 SpawnPumpkin: posición inválida para zona %s; abortando spawn", zone.name))
+        end
+        return
+    end
+
     pumpkinIdCounter = pumpkinIdCounter + 1
     local pumpkinId = pumpkinIdCounter
-
-    local position = GenerateRandomPosition(zone)
     local model = Config.PumpkinHunt.models[math.random(#Config.PumpkinHunt.models)]
 
     activePumpkins[pumpkinId] = {
@@ -310,16 +343,47 @@ local function SpawnPumpkin(zoneIndex)
     end
 
     SetTimeout(Config.PumpkinHunt.despawnTime, function()
-        if activePumpkins[pumpkinId] and not activePumpkins[pumpkinId].collected then
+        local p = activePumpkins[pumpkinId]
+        if p and not p.collected then
             activePumpkins[pumpkinId] = nil
             TriggerClientEvent('pumpkin:remove', -1, pumpkinId)
-
             if Config.DebugMode then
-                print(string.format("^3[PUMPKIN]^7 Calabaza #%d expiró", pumpkinId))
+                print(string.format("^3[PUMPKIN]^7 Calabaza #%d expiró por timeout", pumpkinId))
             end
         end
     end)
 end
+
+local function CleanupStalePumpkins()
+    local now = os.time()
+    local removed = 0
+    for id, p in pairs(activePumpkins) do
+        if (not p.position) or (p.spawnTime and (now - p.spawnTime) > (Config.PumpkinHunt.despawnTime * 2)) then
+            activePumpkins[id] = nil
+            TriggerClientEvent('pumpkin:remove', -1, id)
+            removed = removed + 1
+            if Config.DebugMode then
+                print(string.format("^1[PUMPKIN]^7 Removed stale pumpkin #%d (pos nil or too old)", id))
+            end
+        end
+    end
+    return removed
+end
+
+CreateThread(function()
+    if not Config.PumpkinHunt.enabled then return end
+    while true do
+        Wait(60 * 1000)
+        if Config.DebugMode then
+            local removed = CleanupStalePumpkins()
+            if removed > 0 then
+                print(string.format("^3[PUMPKIN]^7 Limpieza periódica: removidas %d entradas", removed))
+            end
+        else
+            CleanupStalePumpkins()
+        end
+    end
+end)
 
 CreateThread(function()
     if not Config.PumpkinHunt.enabled then return end

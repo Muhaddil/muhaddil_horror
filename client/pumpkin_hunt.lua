@@ -216,7 +216,6 @@ CreateThread(function()
     end
 end)
 
-
 CreateThread(function()
     if not Config.PumpkinHunt.enabled then return end
 
@@ -233,7 +232,7 @@ CreateThread(function()
                     Config.PumpkinHunt.marker.type,
                     pumpkin.position.x,
                     pumpkin.position.y,
-                    pumpkin.position.z,
+                    pumpkin.position.z + 1.0,
                     0.0, 0.0, 0.0,
                     0.0, 0.0, 0.0,
                     Config.PumpkinHunt.marker.scale.x,
@@ -257,9 +256,14 @@ CreateThread(function()
                 end
 
                 if pumpkin.distance <= Config.PumpkinHunt.interactionDistance then
-                    if IsControlJustPressed(0, 38) and not collectingPumpkin then -- E key
-                        collectingPumpkin = true
-                        CollectPumpkin(pumpkin.id, pumpkin.position)
+                    local playerPed = PlayerPedId()
+                    if not IsPedInAnyVehicle(playerPed, false) then
+                        if IsControlJustPressed(0, 38) and not collectingPumpkin then -- E key
+                            collectingPumpkin = true
+                            CollectPumpkin(pumpkin.id, pumpkin.position)
+                        end
+                    else
+                        ShowNotification("No puedes recoger calabazas desde un vehículo", "error")
                     end
                 end
             end
@@ -417,22 +421,61 @@ exports('OpenMenu', OpenPumpkinMenu)
 
 lib.callback.register('pumpkin:getGroundZ', function(coords)
     if not coords then
-        print("^1[ERROR] coords es nil en pumpkin:getGroundZ^7")
+        print("^1[ERROR]^7 coords es nil en pumpkin:getGroundZ")
         return vector3(0, 0, 0)
     end
 
-    local x, y = coords.x, coords.y
-    local foundGround, groundZ = false, 0.0
+    local x, y, z = coords.x, coords.y, coords.z or 500.0
+    local found = false
+    local groundZ = nil
 
-    for i = 1, 10 do
-        local testZ = coords.z + (100.0 - (i * 10.0))
-        foundGround, groundZ = GetGroundZFor_3dCoord(x, y, testZ, true)
-        if foundGround then
-            return vector3(x, y, groundZ)
-        end
-        Wait(5)
+    RequestAdditionalCollisionAtCoord(x, y, z)
+
+    local attempts = 0
+    while not HasCollisionLoadedAroundEntity(PlayerPedId()) and attempts < 20 do
+        Wait(50)
+        attempts = attempts + 1
     end
 
-    print("^3[WARN]^7 No se encontró suelo en (" .. x .. ", " .. y .. ") usando Z=" .. coords.z)
-    return vector3(x, y, coords.z)
+    for checkZ = 500.0, -100.0, -5.0 do
+        local ok, zFound = GetGroundZFor_3dCoord(x, y, checkZ, false)
+        if ok and zFound then
+            found = true
+            groundZ = zFound
+            break
+        end
+        Wait(0)
+    end
+
+    if found and groundZ then
+        local startZ = groundZ + 10.0
+        local endZ = groundZ - 10.0
+        local best = groundZ
+        for checkZ = startZ, endZ, -0.5 do
+            local ok, zFound = GetGroundZFor_3dCoord(x, y, checkZ, false)
+            if ok and zFound then
+                best = zFound
+            end
+            Wait(0)
+        end
+        groundZ = best
+    end
+
+    local onWater, waterZ = GetWaterHeight(x, y, z + 1000.0)
+    if onWater and waterZ and groundZ and waterZ > groundZ then
+        if Config.DebugGroundCheck then
+            print(string.format("^3[WARN]^7 pumpkin:getGroundZ %.2f,%.2f -> agua detectada (waterZ=%.3f > groundZ=%.3f)",
+                x, y, waterZ, groundZ))
+        end
+        return vector3(x, y, z)
+    end
+
+    if not found or not groundZ then
+        if Config.DebugGroundCheck then
+            print(string.format("^1[ERROR]^7 No se encontró suelo en (%.2f, %.2f, %.2f)", x, y, z))
+        end
+        return vector3(x, y, z)
+    end
+
+    return vector3(x, y, groundZ + 0.05)
 end)
