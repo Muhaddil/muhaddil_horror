@@ -218,14 +218,14 @@ end)
 
 CreateThread(function()
     if not Config.PumpkinHunt.enabled then return end
-    
+
     local wasInVehicle = false
     local lastVehicleNotification = 0
     local notificationCooldown = 5000
-    
+
     while true do
         local sleep = 500
-        
+
         if #nearbyPumpkins > 0 then
             sleep = 0
             local playerPed = PlayerPedId()
@@ -233,7 +233,7 @@ CreateThread(function()
             local isInVehicle = IsPedInAnyVehicle(playerPed, false)
             local currentTime = GetGameTimer()
             local canInteract = false
-            
+
             for _, pumpkin in ipairs(nearbyPumpkins) do
                 DrawMarker(
                     Config.PumpkinHunt.marker.type,
@@ -257,14 +257,14 @@ CreateThread(function()
                     nil,
                     Config.PumpkinHunt.marker.drawOnEnts
                 )
-                
+
                 if Config.PumpkinHunt.text3D.enabled and pumpkin.distance <= Config.PumpkinHunt.text3D.distance then
                     DrawText3D(pumpkin.position, Config.PumpkinHunt.text3D.text)
                 end
-                
+
                 if pumpkin.distance <= Config.PumpkinHunt.interactionDistance then
                     canInteract = true
-                    
+
                     if not isInVehicle then
                         if IsControlJustPressed(0, 38) and not collectingPumpkin then -- E key
                             collectingPumpkin = true
@@ -273,20 +273,20 @@ CreateThread(function()
                     end
                 end
             end
-            
+
             if isInVehicle and canInteract then
-                if (not wasInVehicle or IsControlJustPressed(0, 38)) and 
-                   (currentTime - lastVehicleNotification) > notificationCooldown then
+                if (not wasInVehicle or IsControlJustPressed(0, 38)) and
+                    (currentTime - lastVehicleNotification) > notificationCooldown then
                     ShowNotification("No puedes recoger calabazas desde un vehículo", "error")
                     lastVehicleNotification = currentTime
                 end
             end
-            
+
             wasInVehicle = isInVehicle
         else
             wasInVehicle = false
         end
-        
+
         Wait(sleep)
     end
 end)
@@ -442,79 +442,409 @@ lib.callback.register('pumpkin:getGroundZ', function(coords)
         print("^1[ERROR]^7 coords es nil en pumpkin:getGroundZ")
         return vector3(0, 0, 0)
     end
-    
+
     local x, y, z = coords.x, coords.y, coords.z or 500.0
-    
-    RequestAdditionalCollisionAtCoord(x, y, z)
-    
-    local attempts = 0
-    local collisionLoaded = false
-    
-    while attempts < 50 do
-        if HasCollisionLoadedAroundEntity(PlayerPedId()) then
-            Wait(100)
-            collisionLoaded = true
-            break
-        end
-        Wait(100)
-        attempts = attempts + 1
-        
-        if attempts % 5 == 0 then
-            RequestAdditionalCollisionAtCoord(x, y, z)
-        end
+
+    if not x or not y then
+        print("^1[ERROR]^7 Coordenadas inválidas")
+        return vector3(0, 0, z)
     end
-    
-    if not collisionLoaded and Config.DebugGroundCheck then
-        print(string.format("^3[WARN]^7 Colisión no cargada completamente en (%.2f, %.2f)", x, y))
+
+    local function isValidZ(zValue)
+        return zValue and zValue ~= 0.0 and zValue > -100.0 and zValue < 3000.0
     end
-    
-    local found = false
-    local groundZ = nil
-    
-    for checkZ = 1000.0, -200.0, -10.0 do
-        local ok, zFound = GetGroundZFor_3dCoord(x, y, checkZ, false)
-        if ok and zFound then
-            found = true
-            groundZ = zFound
-            break
-        end
-        Wait(0)
+
+    local function isReasonableZ(zValue, referenceZ, maxDiff)
+        maxDiff = maxDiff or 150
+        return math.abs(zValue - referenceZ) <= maxDiff
     end
-    
-    if found and groundZ then
-        local startZ = groundZ + 15.0
-        local endZ = groundZ - 15.0
-        local best = groundZ
-        
-        for checkZ = startZ, endZ, -0.2 do
-            local ok, zFound = GetGroundZFor_3dCoord(x, y, checkZ, false)
-            if ok and zFound then
-                best = zFound
-            end
-            Wait(0)
-        end
-        groundZ = best
-    end
-    
-    local onWater, waterZ = GetWaterHeight(x, y, z + 1000.0)
-    if onWater and waterZ and groundZ and waterZ > groundZ then
-        if Config.DebugGroundCheck then
-            print(string.format("^3[WARN]^7 Agua detectada en (%.2f, %.2f) -> waterZ=%.3f > groundZ=%.3f",
-                x, y, waterZ, groundZ))
-        end
-        return vector3(x, y, z)
-    end
-    
-    if not found or not groundZ then
-        if Config.DebugGroundCheck then
-            print(string.format("^1[ERROR]^7 No se encontró suelo en (%.2f, %.2f, %.2f)", x, y, z))
-        end
-        return vector3(x, y, z)
-    end
-    
+
     if Config.DebugGroundCheck then
-        print(string.format("^2[OK]^7 Suelo encontrado en (%.2f, %.2f) -> Z=%.3f", x, y, groundZ))
+        print(string.format("^6[INICIO]^7 Buscando suelo en (%.2f, %.2f, %.2f)", x, y, z))
     end
-    
-    return vector3(x, y, groundZ + 0.05)
+
+    local loadRadii = { 0, 2, 5, 8, 10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100, 125, 150, 175, 200, 250, 300 }
+    local loadHeights = {
+        z - 200, z - 150, z - 100, z - 50, z, z + 25, z + 50, z + 75, z + 100,
+        z + 150, z + 200, z + 300, z + 500,
+        -50, 0, 50, 100, 150, 200, 300, 500, 800, 1000, 1500, 2000
+    }
+
+    for _, radius in ipairs(loadRadii) do
+        if radius == 0 then
+            for _, height in ipairs(loadHeights) do
+                RequestAdditionalCollisionAtCoord(x, y, height)
+            end
+        else
+            local numAngles = math.min(16, math.max(8, math.floor(360 / (radius / 5))))
+            for angle = 0, 360, 360 / numAngles do
+                local rad = math.rad(angle)
+                local offsetX = math.cos(rad) * radius
+                local offsetY = math.sin(rad) * radius
+                for _, height in ipairs(loadHeights) do
+                    RequestAdditionalCollisionAtCoord(x + offsetX, y + offsetY, height)
+                end
+            end
+        end
+    end
+
+    for iteration = 1, 12 do
+        local waitTime = iteration <= 4 and 200 or iteration <= 8 and 150 or 100
+        Wait(waitTime)
+
+        local focusRadii = iteration <= 4 and { 0, 10, 25, 50 } or iteration <= 8 and { 75, 100, 150 } or { 200, 250 }
+        for _, radius in ipairs(focusRadii) do
+            for angle = 0, 360, 45 do
+                local rad = math.rad(angle)
+                local offsetX = math.cos(rad) * radius
+                local offsetY = math.sin(rad) * radius
+                for _, heightOffset in ipairs({ -100, 0, 50, 100, 200 }) do
+                    RequestAdditionalCollisionAtCoord(x + offsetX, y + offsetY, z + heightOffset)
+                end
+            end
+        end
+    end
+
+    local groundZ = nil
+    local candidateZs = {}
+    local rayConfigs = {
+        { start = z + 500, endZ = z - 300, flags = 1,          name = "local_terrain" },
+        { start = z + 300, endZ = z - 200, flags = -1,         name = "local_all" },
+        { start = z + 200, endZ = z - 150, flags = 17,         name = "local_terrain+veh" },
+
+        { start = 2500,    endZ = -200,    flags = 1,          name = "terrain_max" },
+        { start = 2000,    endZ = -150,    flags = 1,          name = "terrain_high" },
+        { start = 1500,    endZ = -100,    flags = -1,         name = "all_high" },
+        { start = 1000,    endZ = -100,    flags = -1,         name = "all_mid" },
+        { start = 800,     endZ = -100,    flags = 17,         name = "terrain+veh_mid" },
+        { start = 500,     endZ = -50,     flags = 1,          name = "terrain_low" },
+        { start = 300,     endZ = -50,     flags = -1,         name = "all_low" },
+
+        { start = 1500,    endZ = -200,    flags = 4294967295, name = "everything_high" },
+        { start = 1000,    endZ = -150,    flags = 4294967295, name = "everything_mid" },
+        { start = 500,     endZ = -100,    flags = 4294967295, name = "everything_low" },
+    }
+
+    local directHeights = {}
+
+    for offset = -200, 500, 5 do
+        table.insert(directHeights, z + offset)
+    end
+
+    for h = 2500, -150, -10 do
+        table.insert(directHeights, h)
+    end
+
+    local uniqueHeights = {}
+    local seen = {}
+    for _, h in ipairs(directHeights) do
+        local rounded = math.floor(h + 0.5)
+        if not seen[rounded] then
+            seen[rounded] = true
+            table.insert(uniqueHeights, h)
+        end
+    end
+
+    table.sort(uniqueHeights, function(a, b)
+        return math.abs(a - z) < math.abs(b - z)
+    end)
+
+    for _, startHeight in ipairs(uniqueHeights) do
+        local directOk, directZ = GetGroundZFor_3dCoord(x, y, startHeight, false)
+        if directOk and isValidZ(directZ) then
+            if isReasonableZ(directZ, z, 150) then
+                groundZ = directZ
+                if Config.DebugGroundCheck then
+                    print(string.format("^2[DIRECTO]^7 Suelo encontrado desde altura %.1f -> Z=%.3f", startHeight,
+                        groundZ))
+                end
+                break
+            else
+                table.insert(candidateZs,
+                    { z = directZ, method = "directo", detail = string.format("altura %.1f", startHeight) })
+            end
+        end
+    end
+
+    if not groundZ then
+        local radialPoints = {}
+
+        for radius = 1, 150 do
+            local angleStep = math.max(1, math.floor(180 / math.max(1, radius)))
+            for angle = 0, 360, angleStep do
+                local rad = math.rad(angle)
+                local offsetX = math.cos(rad) * radius
+                local offsetY = math.sin(rad) * radius
+                table.insert(radialPoints, { x = offsetX, y = offsetY, dist = radius })
+            end
+        end
+
+        table.sort(radialPoints, function(a, b) return a.dist < b.dist end)
+
+        for _, point in ipairs(radialPoints) do
+            local testX = x + point.x
+            local testY = y + point.y
+
+            local testHeights = {
+                z, z + 25, z + 50, z + 100, z + 150, z + 200, z + 300,
+                z - 25, z - 50, z - 100,
+                500, 1000, 1500, 300, 100, 50, 0
+            }
+
+            for _, testHeight in ipairs(testHeights) do
+                local nearOk, nearZ = GetGroundZFor_3dCoord(testX, testY, testHeight, false)
+                if nearOk and isValidZ(nearZ) then
+                    if isReasonableZ(nearZ, z, 150) then
+                        groundZ = nearZ
+                        if Config.DebugGroundCheck then
+                            print(string.format("^5[RADIAL]^7 Suelo a %.1fm offset(%.0f,%.0f) -> Z=%.3f",
+                                point.dist, point.x, point.y, groundZ))
+                        end
+                        break
+                    else
+                        table.insert(candidateZs,
+                            { z = nearZ, method = "radial", detail = string.format("%.1fm", point.dist) })
+                    end
+                end
+            end
+
+            if groundZ then break end
+        end
+    end
+
+    if not groundZ then
+        for _, cfg in ipairs(rayConfigs) do
+            local rayHandle = StartShapeTestRay(x, y, cfg.start, x, y, cfg.endZ, cfg.flags, 0, 7)
+            Wait(0)
+            local _, hit, hitCoords = GetShapeTestResult(rayHandle)
+
+            if hit and hitCoords and isValidZ(hitCoords.z) then
+                local verifyOk, verifyZ = GetGroundZFor_3dCoord(x, y, hitCoords.z + 2.0, false)
+                local finalZ = (verifyOk and isValidZ(verifyZ)) and verifyZ or hitCoords.z
+
+                if isReasonableZ(finalZ, z, 150) then
+                    groundZ = finalZ
+                    if Config.DebugGroundCheck then
+                        print(string.format("^3[RAYCAST]^7 Suelo (%s) -> Z=%.3f", cfg.name, groundZ))
+                    end
+                    break
+                else
+                    table.insert(candidateZs, { z = finalZ, method = "raycast", detail = cfg.name })
+                end
+            end
+        end
+
+        if not groundZ then
+            local rayRadii = {}
+            for r = 2, 100, 3 do
+                for angle = 0, 360, 30 do
+                    local rad = math.rad(angle)
+                    table.insert(rayRadii, { x = math.cos(rad) * r, y = math.sin(rad) * r, dist = r })
+                end
+            end
+
+            for _, offset in ipairs(rayRadii) do
+                for _, cfg in ipairs(rayConfigs) do
+                    local rayHandle = StartShapeTestRay(
+                        x + offset.x, y + offset.y, cfg.start,
+                        x + offset.x, y + offset.y, cfg.endZ,
+                        cfg.flags, 0, 7
+                    )
+                    Wait(0)
+                    local _, hit, hitCoords = GetShapeTestResult(rayHandle)
+
+                    if hit and hitCoords and isValidZ(hitCoords.z) then
+                        if isReasonableZ(hitCoords.z, z, 150) then
+                            groundZ = hitCoords.z
+                            if Config.DebugGroundCheck then
+                                print(string.format("^3[RAYCAST]^7 Suelo (%s) offset(%.0f,%.0f) -> Z=%.3f",
+                                    cfg.name, offset.x, offset.y, groundZ))
+                            end
+                            break
+                        else
+                            table.insert(candidateZs,
+                                { z = hitCoords.z, method = "raycast", detail = string.format("%s offset %.0f", cfg.name,
+                                    offset.dist) })
+                        end
+                    end
+                end
+                if groundZ then break end
+            end
+        end
+    end
+
+    if not groundZ then
+        if Config.DebugGroundCheck then
+            print(string.format("^3[BÚSQUEDA EXPANDIDA]^7 No se encontró suelo cercano, buscando sin límites..."))
+        end
+
+        for _, startHeight in ipairs(uniqueHeights) do
+            local directOk, directZ = GetGroundZFor_3dCoord(x, y, startHeight, false)
+            if directOk and isValidZ(directZ) then
+                groundZ = directZ
+                if Config.DebugGroundCheck then
+                    print(string.format("^3[EXPANDIDO]^7 Suelo directo desde altura %.1f -> Z=%.3f (diff: %.1f)",
+                        startHeight, groundZ, math.abs(groundZ - z)))
+                end
+                break
+            end
+        end
+
+        if not groundZ then
+            for radius = 1, 200, 3 do
+                local found = false
+                for angle = 0, 360, 20 do
+                    local rad = math.rad(angle)
+                    local testX = x + math.cos(rad) * radius
+                    local testY = y + math.sin(rad) * radius
+
+                    for _, testHeight in ipairs({ z, z + 100, z + 200, 500, 1000, 300, 100, 0 }) do
+                        local nearOk, nearZ = GetGroundZFor_3dCoord(testX, testY, testHeight, false)
+                        if nearOk and isValidZ(nearZ) then
+                            groundZ = nearZ
+                            if Config.DebugGroundCheck then
+                                print(string.format("^3[EXPANDIDO]^7 Suelo radial a %.1fm -> Z=%.3f (diff: %.1f)",
+                                    radius, groundZ, math.abs(groundZ - z)))
+                            end
+                            found = true
+                            break
+                        end
+                    end
+                    if found then break end
+                end
+                if found then break end
+            end
+        end
+
+        if not groundZ then
+            for _, cfg in ipairs(rayConfigs) do
+                local rayHandle = StartShapeTestRay(x, y, cfg.start, x, y, cfg.endZ, cfg.flags, 0, 7)
+                Wait(0)
+                local _, hit, hitCoords = GetShapeTestResult(rayHandle)
+
+                if hit and hitCoords and isValidZ(hitCoords.z) then
+                    groundZ = hitCoords.z
+                    if Config.DebugGroundCheck then
+                        print(string.format("^3[EXPANDIDO]^7 Raycast (%s) -> Z=%.3f (diff: %.1f)",
+                            cfg.name, groundZ, math.abs(groundZ - z)))
+                    end
+                    break
+                end
+            end
+        end
+
+        if not groundZ then
+            for r = 5, 150, 10 do
+                for angle = 0, 360, 45 do
+                    local rad = math.rad(angle)
+                    local offsetX = math.cos(rad) * r
+                    local offsetY = math.sin(rad) * r
+
+                    for _, cfg in ipairs({ { start = 1500, endZ = -200, flags = -1 }, { start = 1000, endZ = -100, flags = 1 } }) do
+                        local rayHandle = StartShapeTestRay(
+                            x + offsetX, y + offsetY, cfg.start,
+                            x + offsetX, y + offsetY, cfg.endZ,
+                            cfg.flags, 0, 7
+                        )
+                        Wait(0)
+                        local _, hit, hitCoords = GetShapeTestResult(rayHandle)
+
+                        if hit and hitCoords and isValidZ(hitCoords.z) then
+                            groundZ = hitCoords.z
+                            if Config.DebugGroundCheck then
+                                print(string.format("^3[EXPANDIDO]^7 Raycast radial %.1fm -> Z=%.3f (diff: %.1f)",
+                                    r, groundZ, math.abs(groundZ - z)))
+                            end
+                            break
+                        end
+                    end
+                    if groundZ then break end
+                end
+                if groundZ then break end
+            end
+        end
+    end
+
+    if not groundZ and #candidateZs > 0 then
+        table.sort(candidateZs, function(a, b)
+            return math.abs(a.z - z) < math.abs(b.z - z)
+        end)
+
+        groundZ = candidateZs[1].z
+        if Config.DebugGroundCheck then
+            print(string.format("^3[CANDIDATO]^7 Usando mejor candidato: %s %s -> Z=%.3f (diff: %.1f)",
+                candidateZs[1].method, candidateZs[1].detail, groundZ, math.abs(groundZ - z)))
+        end
+    end
+
+    if groundZ then
+        local bestZ = groundZ
+        local bestDiff = math.abs(groundZ - z)
+
+        for offset = -20.0, 20.0, 0.2 do
+            local testZ = groundZ + offset
+            local ok, zFound = GetGroundZFor_3dCoord(x, y, testZ, false)
+            if ok and isValidZ(zFound) then
+                local diff = math.abs(zFound - z)
+                if diff < bestDiff then
+                    bestZ = zFound
+                    bestDiff = diff
+                end
+            end
+        end
+
+        if math.abs(bestZ - groundZ) > 0.1 then
+            if Config.DebugGroundCheck then
+                print(string.format("^6[REFINADO]^7 Z refinado: %.3f -> %.3f (mejora: %.3f)",
+                    groundZ, bestZ, math.abs(groundZ - bestZ)))
+            end
+            groundZ = bestZ
+        end
+    end
+
+    local onWater, waterZ = GetWaterHeight(x, y, z)
+    if onWater and waterZ and waterZ > -100.0 and waterZ < 1000.0 then
+        if not groundZ or (waterZ > groundZ + 0.5) then
+            if Config.DebugGroundCheck then
+                print(string.format("^6[AGUA]^7 En (%.2f, %.2f) -> waterZ=%.3f", x, y, waterZ))
+            end
+            return vector3(x, y, waterZ + 0.5)
+        end
+    end
+
+    if not groundZ or not isValidZ(groundZ) then
+        if z > -50 and z < 2000 then
+            local rayHandle = StartShapeTestRay(x, y, z + 50, x, y, z - 50, -1, 0, 7)
+            Wait(0)
+            local _, hit, hitCoords = GetShapeTestResult(rayHandle)
+
+            if hit and hitCoords then
+                if Config.DebugGroundCheck then
+                    print(string.format("^3[FALLBACK-VERIFICADO]^7 Usando Z verificado %.2f en (%.2f, %.2f)",
+                        hitCoords.z, x, y))
+                end
+                return vector3(x, y, hitCoords.z + 0.1)
+            end
+
+            if Config.DebugGroundCheck then
+                print(string.format("^3[FALLBACK]^7 Usando Z original %.2f en (%.2f, %.2f)", z, x, y))
+            end
+            return vector3(x, y, z + 0.1)
+        end
+
+        local safeZ = 50.0
+        if Config.DebugGroundCheck then
+            print(string.format("^1[ERROR]^7 Sin suelo válido en (%.2f, %.2f). Usando Z seguro: %.1f", x, y, safeZ))
+        end
+        return vector3(x, y, safeZ)
+    end
+
+    if Config.DebugGroundCheck then
+        local diff = math.abs(groundZ - z)
+        local status = diff > 100 and "^1[GRAN DIFF]^7" or diff > 20 and "^3[DIFF]^7" or "^2[OK]^7"
+        print(string.format("%s Suelo en (%.2f, %.2f) -> Z=%.3f (orig: %.2f) diff: %.1f",
+            status, x, y, groundZ, z, diff))
+    end
+
+    return vector3(x, y, groundZ + 0.1)
 end)

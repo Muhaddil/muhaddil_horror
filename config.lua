@@ -286,28 +286,29 @@ Config.RandomPlayerJumpscares = {
     excludeInVehicle = false,
 
     jumpscareTypes = {
-        { id = "ghost", weight = 30 },
-        { id = "demon", weight = 20 },
+        { id = "ghost",  weight = 30 },
+        { id = "demon",  weight = 20 },
         { id = "zombie", weight = 25 },
         { id = "shadow", weight = 15 },
-        { id = "clown", weight = 10 }
+        { id = "clown",  weight = 10 }
     },
 }
 
+Config.DebugGroundCheck = false
 Config.PumpkinHunt = {
     enabled = true,
-    
+
     eventStartDate = "2025-10-20",
     eventEndDate = "2025-11-05",
     checkDateOnCollection = false,
-    
+
     menuCommand = "pumpkins",
     menuKey = "F7",
-    
+
     spawnInterval = 300000, -- 5 minutes
     maxActivePumpkins = 30, -- Total on map
-    despawnTime = 600000, -- 10 minutes
-    
+    despawnTime = 600000,   -- 10 minutes
+
     interactionDistance = 2.5,
     showDistance = 15.0,
     warningNotificationDistance = 30.0,
@@ -320,28 +321,30 @@ Config.PumpkinHunt = {
         eventNotActive = "El evento de Halloween no está activo",
         menuOpened = "Menú de calabazas abierto",
     },
-    
+
     models = {
         "prop_veg_crop_03_pump",
         "m23_1_prop_m31_stack_pk_01a",
         "m23_1_prop_m31_stack_pk_01b",
+        "m23_1_prop_m31_stack_pk_01c",
+        "m23_1_prop_m31_crate_pk_01a",
     },
-    
+
     collectEffects = {
         particle = true,
         particleDict = "core",
         particleName = "ent_dst_elec_fire_sp",
         particleDuration = 2000,
-        
+
         sound = true,
         soundName = "PICK_UP",
         soundSet = "HUD_FRONTEND_DEFAULT_SOUNDSET",
-        
+
         screenEffect = true,
         screenEffectName = "HeistCelebPass",
         screenEffectDuration = 1000,
     },
-    
+
     spawnZones = {
         {
             name = "Centro de Los Santos",
@@ -379,8 +382,20 @@ Config.PumpkinHunt = {
             radius = 400.0,
             maxPumpkins = 5,
         },
+        {
+            name = "Cementerio",
+            center = vector3(-1737.0342, -207.4274, 57.5091),
+            radius = 100.0,
+            maxPumpkins = 8,
+        },
+        {
+            name = "Concesionario Simeon",
+            center = vector3(-57.5019, -1115.0931, 26.4321),
+            radius = 200.0,
+            maxPumpkins = 7,
+        },
     },
-    
+
     rewards = {
         {
             pumpkinsRequired = 5,
@@ -389,7 +404,7 @@ Config.PumpkinHunt = {
             icon = "🎃",
             rewards = {
                 { type = "money", amount = 5000 },
-                { type = "item", name = "water", amount = 5 },
+                { type = "item",  name = "water", amount = 5 },
             }
         },
         {
@@ -399,8 +414,8 @@ Config.PumpkinHunt = {
             icon = "🎃🎃",
             rewards = {
                 { type = "money", amount = 15000 },
-                { type = "item", name = "bread", amount = 10 },
-                { type = "item", name = "bandage", amount = 3 },
+                { type = "item",  name = "bread",   amount = 10 },
+                { type = "item",  name = "bandage", amount = 3 },
             }
         },
         {
@@ -409,8 +424,8 @@ Config.PumpkinHunt = {
             description = "Encuentra 30 calabazas",
             icon = "🎃🎃🎃",
             rewards = {
-                { type = "money", amount = 30000 },
-                { type = "item", name = "lockpick", amount = 5 },
+                { type = "money",  amount = 30000 },
+                { type = "item",   name = "lockpick",     amount = 5 },
                 { type = "weapon", name = "WEAPON_KNIFE", ammo = 0 },
             }
         },
@@ -420,9 +435,9 @@ Config.PumpkinHunt = {
             description = "Encuentra 50 calabazas",
             icon = "👑🎃",
             rewards = {
-                { type = "money", amount = 50000 },
+                { type = "money",       amount = 50000 },
                 { type = "black_money", amount = 10000 },
-                { type = "item", name = "radio", amount = 1 },
+                { type = "item",        name = "radio", amount = 1 },
             }
         },
         {
@@ -431,14 +446,14 @@ Config.PumpkinHunt = {
             description = "Encuentra 100 calabazas - ¡Completado!",
             icon = "🏆👑🎃",
             rewards = {
-                { type = "money", amount = 100000 },
+                { type = "money",       amount = 100000 },
                 { type = "black_money", amount = 50000 },
-                { type = "item", name = "halloween_mask", amount = 1 },
-                { type = "weapon", name = "WEAPON_MACHETE", ammo = 0 },
+                { type = "item",        name = "halloween_mask", amount = 1 },
+                { type = "weapon",      name = "WEAPON_MACHETE", ammo = 0 },
             }
         },
     },
-    
+
     marker = {
         type = 2,
         scale = vector3(0.5, 0.5, 0.5),
@@ -448,44 +463,44 @@ Config.PumpkinHunt = {
         rotate = true,
         drawOnEnts = false,
     },
-    
+
     text3D = {
         enabled = true,
         distance = 5.0,
         text = "~g~[E]~w~ Recoger calabaza",
         scale = 0.35,
     },
-    
+
     leaderboard = {
         enabled = true,
         showInMenu = true,
         topPlayersCount = 10,
         updateInterval = 60000,
     },
-    
+
     statistics = {
         trackCollectionTime = true,
         trackCollectionLocation = true,
         showPersonalStats = true,
     },
-    
+
     framework = {
         esx = {
             moneyAccount = "money",
-            blackMoneyAccount = "black_money", 
+            blackMoneyAccount = "black_money",
         },
         qb = {
             moneyType = "cash",
             blackMoneyType = "black_money",
         },
     },
-    
+
     database = {
         tableName = "pumpkin_hunt_data",
         autoCreateTable = true,
         saveInterval = 30000,
     },
-    
+
     animations = {
         collect = {
             dict = "pickup_object",

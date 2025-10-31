@@ -250,11 +250,9 @@ local function IsEventActive()
 end
 
 local function GenerateRandomPosition(zone)
-    local players = GetPlayers()
-    if #players == 0 then return nil end
-
-    local anyPlayer = tonumber(players[1])
+    local position = nil
     local tries = 10
+
     for i = 1, tries do
         local angle = math.random() * 2 * math.pi
         local distance = math.random() * zone.radius
@@ -263,32 +261,62 @@ local function GenerateRandomPosition(zone)
         local y = zone.center.y + math.sin(angle) * distance
         local z = zone.center.z
 
-        local position = nil
-        local ok, res = pcall(function()
-            return lib.callback.await('pumpkin:getGroundZ', anyPlayer, vector3(x, y, z))
-        end)
-        if ok then
-            position = res
-        else
-            position = nil
+        local nearbyPlayers = {}
+        local players = GetPlayers()
+
+        for _, playerId in ipairs(players) do
+            local playerPed = GetPlayerPed(playerId)
+            local playerCoords = GetEntityCoords(playerPed)
+            local distanceToPos = #(vector3(x, y, z) - playerCoords)
+
+            if distanceToPos < 300.0 then
+                table.insert(nearbyPlayers, {
+                    id = playerId,
+                    distance = distanceToPos,
+                    coords = playerCoords
+                })
+            end
         end
 
-        if position then
-            return vector3(x, y, position.z or z)
+        if #nearbyPlayers > 0 then
+            table.sort(nearbyPlayers, function(a, b) return a.distance < b.distance end)
+            local closestPlayer = nearbyPlayers[1].id
+
+            if Config.DebugMode then
+                print(string.format("^6[PUMPKIN]^7 Jugador más cercano: %d a %.1fm de (%.2f, %.2f)", 
+                    closestPlayer, nearbyPlayers[1].distance, x, y))
+            end
+
+            local ok, res = pcall(function()
+                return lib.callback.await('pumpkin:getGroundZ', closestPlayer, vector3(x, y, z))
+            end)
+
+            if ok and res then
+                position = vector3(x, y, res.z)
+                if Config.DebugMode then
+                    print(string.format("^2[PUMPKIN]^7 Posición válida encontrada en intento %d: (%.2f, %.2f, %.2f)", 
+                        i, position.x, position.y, position.z))
+                end
+                break
+            else
+                if Config.DebugMode then
+                    print(string.format("^3[PUMPKIN]^7 Falló groundZ en intento %d en (%.2f, %.2f)", i, x, y))
+                end
+            end
         else
             if Config.DebugMode then
-                print(string.format("^3[PUMPKIN]^7 GenerateRandomPosition intento %d fallido en zona %s (x=%.2f y=%.2f)",
-                    i, zone.name or zoneIndex, x, y))
+                print(string.format("^3[PUMPKIN]^7 No hay jugadores cercanos en (%.2f, %.2f) - intento %d", x, y, i))
             end
-            Wait(10)
         end
+
+        Wait(10)
     end
 
-    if Config.DebugMode then
-        print(string.format("^1[PUMPKIN]^7 No se obtuvo groundZ en zona %s; usando center as fallback.",
-            zone.name or "unknown"))
+    if not position and Config.DebugMode then
+        print(string.format("^1[PUMPKIN]^7 No se pudo generar posición válida después de %d intentos", tries))
     end
-    return vector3(zone.center.x, zone.center.y, zone.center.z)
+
+    return position
 end
 
 local function SpawnPumpkin(zoneIndex)
@@ -303,6 +331,28 @@ local function SpawnPumpkin(zoneIndex)
     local zone = Config.PumpkinHunt.spawnZones[zoneIndex]
     if not zone then
         if Config.DebugMode then print("^1[PUMPKIN]^7 SpawnPumpkin: zona inválida: " .. tostring(zoneIndex)) end
+        return
+    end
+
+    local playersInZone = false
+    local players = GetPlayers()
+    local zoneCenter = vector3(zone.center.x, zone.center.y, zone.center.z)
+    
+    for _, playerId in ipairs(players) do
+        local playerPed = GetPlayerPed(playerId)
+        local playerCoords = GetEntityCoords(playerPed)
+        local distanceToZone = #(zoneCenter - playerCoords)
+        
+        if distanceToZone < (zone.radius + 100.0) then
+            playersInZone = true
+            break
+        end
+    end
+    
+    if not playersInZone then
+        if Config.DebugMode then
+            print(string.format("^3[PUMPKIN]^7 No hay jugadores en zona %s - omitiendo spawn", zone.name))
+        end
         return
     end
 
@@ -340,8 +390,8 @@ local function SpawnPumpkin(zoneIndex)
     TriggerClientEvent('pumpkin:spawn', -1, pumpkinId, position, model)
 
     if Config.DebugMode then
-        print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en %s (Total: %d)",
-            pumpkinId, zone.name, CountActivePumpkins()))
+        print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en %s (%.2f, %.2f, %.2f) (Total: %d)",
+            pumpkinId, zone.name, position.x, position.y, position.z, CountActivePumpkins()))
     end
 
     SetTimeout(Config.PumpkinHunt.despawnTime, function()
