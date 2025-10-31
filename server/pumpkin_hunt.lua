@@ -277,14 +277,16 @@ local function GenerateRandomPosition(zone)
             return vector3(x, y, position.z or z)
         else
             if Config.DebugMode then
-                print(string.format("^3[PUMPKIN]^7 GenerateRandomPosition intento %d fallido en zona %s (x=%.2f y=%.2f)", i, zone.name or zoneIndex, x, y))
+                print(string.format("^3[PUMPKIN]^7 GenerateRandomPosition intento %d fallido en zona %s (x=%.2f y=%.2f)",
+                    i, zone.name or zoneIndex, x, y))
             end
             Wait(10)
         end
     end
 
     if Config.DebugMode then
-        print(string.format("^1[PUMPKIN]^7 No se obtuvo groundZ en zona %s; usando center as fallback.", zone.name or "unknown"))
+        print(string.format("^1[PUMPKIN]^7 No se obtuvo groundZ en zona %s; usando center as fallback.",
+            zone.name or "unknown"))
     end
     return vector3(zone.center.x, zone.center.y, zone.center.z)
 end
@@ -292,7 +294,7 @@ end
 local function SpawnPumpkin(zoneIndex)
     if CountActivePumpkins() >= Config.PumpkinHunt.maxActivePumpkins then
         if Config.DebugMode then
-            print(string.format("^3[PUMPKIN]^7 Límite global alcanzado (%d/%d)", 
+            print(string.format("^3[PUMPKIN]^7 Límite global alcanzado (%d/%d)",
                 CountActivePumpkins(), Config.PumpkinHunt.maxActivePumpkins))
         end
         return
@@ -307,7 +309,7 @@ local function SpawnPumpkin(zoneIndex)
     local zoneCount = CountPumpkinsInZone(zoneIndex)
     if zoneCount >= zone.maxPumpkins then
         if Config.DebugMode then
-            print(string.format("^3[PUMPKIN]^7 Límite de zona alcanzado en %s (%d/%d)", 
+            print(string.format("^3[PUMPKIN]^7 Límite de zona alcanzado en %s (%d/%d)",
                 zone.name, zoneCount, zone.maxPumpkins))
         end
         return
@@ -338,7 +340,7 @@ local function SpawnPumpkin(zoneIndex)
     TriggerClientEvent('pumpkin:spawn', -1, pumpkinId, position, model)
 
     if Config.DebugMode then
-        print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en %s (Total: %d)", 
+        print(string.format("^2[PUMPKIN]^7 Calabaza #%d spawneada en %s (Total: %d)",
             pumpkinId, zone.name, CountActivePumpkins()))
     end
 
@@ -402,8 +404,19 @@ CreateThread(function()
         Wait(Config.PumpkinHunt.spawnInterval)
 
         if IsEventActive() then
-            local randomZone = math.random(1, #Config.PumpkinHunt.spawnZones)
-            SpawnPumpkin(randomZone)
+            for zoneIndex, zone in ipairs(Config.PumpkinHunt.spawnZones) do
+                local currentInZone = CountPumpkinsInZone(zoneIndex)
+                local toSpawn = zone.maxPumpkins - currentInZone
+
+                for i = 1, toSpawn do
+                    if CountActivePumpkins() < Config.PumpkinHunt.maxActivePumpkins then
+                        SpawnPumpkin(zoneIndex)
+                        Wait(200)
+                    else
+                        break
+                    end
+                end
+            end
         end
     end
 end)
@@ -691,7 +704,7 @@ lib.callback.register('pumpkin:collect', function(source, pumpkinId)
     UpdateLeaderboard()
 
     if Config.DebugMode then
-        print(string.format("^2[PUMPKIN]^7 %s recolectó calabaza #%d (Total: %d/%d activas)", 
+        print(string.format("^2[PUMPKIN]^7 %s recolectó calabaza #%d (Total: %d/%d activas)",
             GetPlayerName(source), pumpkinId, CountActivePumpkins(), Config.PumpkinHunt.maxActivePumpkins))
     end
 
@@ -908,7 +921,6 @@ RegisterCommand('pumpkinadmin', function(source, args)
 
         local msg = string.format("^2Calabaza spawneada en zona %d^7", zoneIndex)
         if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } }) end
-    
     elseif action == "clear" then
         local count = 0
         for id, _ in pairs(activePumpkins) do
@@ -919,7 +931,6 @@ RegisterCommand('pumpkinadmin', function(source, args)
 
         local msg = string.format("^2Limpiadas %d calabazas^7", count)
         if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } }) end
-    
     elseif action == "stats" then
         local targetId = tonumber(args[2])
         if not targetId or not GetPlayerName(targetId) then
@@ -945,20 +956,21 @@ RegisterCommand('pumpkinadmin', function(source, args)
                 end
             end
         end)
-    
     elseif action == "list" then
         if next(activePumpkins) == nil then
             local msg = "^1No hay calabazas activas actualmente.^7"
-            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msg } }) end
+            if source == 0 then print(msg) else TriggerClientEvent('chat:addMessage', source,
+                    { args = { "[PUMPKIN]", msg } }) end
             return
         end
 
         local msgHeader = "^3=== COORDENADAS DE CALABAZAS ACTIVAS ===^7"
-        if source == 0 then print(msgHeader) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msgHeader } }) end
+        if source == 0 then print(msgHeader) else TriggerClientEvent('chat:addMessage', source,
+                { args = { "[PUMPKIN]", msgHeader } }) end
 
         for id, data in pairs(activePumpkins) do
             if not data.collected then
-                local coords = string.format("ID %d: (x=%.2f, y=%.2f, z=%.2f) - %s", 
+                local coords = string.format("ID %d: (x=%.2f, y=%.2f, z=%.2f) - %s",
                     id, data.position.x, data.position.y, data.position.z, data.zoneName)
                 if source == 0 then
                     print(coords)
@@ -968,9 +980,10 @@ RegisterCommand('pumpkinadmin', function(source, args)
             end
         end
 
-        local msgFooter = string.format("^3Total activas: %d/%d^7", CountActivePumpkins(), Config.PumpkinHunt.maxActivePumpkins)
-        if source == 0 then print(msgFooter) else TriggerClientEvent('chat:addMessage', source, { args = { "[PUMPKIN]", msgFooter } }) end
-    
+        local msgFooter = string.format("^3Total activas: %d/%d^7", CountActivePumpkins(),
+            Config.PumpkinHunt.maxActivePumpkins)
+        if source == 0 then print(msgFooter) else TriggerClientEvent('chat:addMessage', source,
+                { args = { "[PUMPKIN]", msgFooter } }) end
     elseif action == "reset" then
         local targetId = tonumber(args[2])
         if not targetId or not GetPlayerName(targetId) then
@@ -1005,7 +1018,6 @@ RegisterCommand('pumpkinadmin', function(source, args)
                 end
             end)
         end
-    
     elseif action == "give" then
         local targetId = tonumber(args[2])
         local amount = tonumber(args[3]) or 1
@@ -1035,7 +1047,6 @@ RegisterCommand('pumpkinadmin', function(source, args)
                 end
             end
         end)
-    
     elseif action == "info" then
         local msg = string.format([[
 ^3=== INFO SISTEMA CALABAZAS ===^7
