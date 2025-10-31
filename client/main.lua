@@ -121,10 +121,10 @@ Citizen.CreateThread(function()
         local ped = PlayerPedId()
         if inHorrorZone and IsPedInAnyVehicle(ped, false) and not Config.HorrorZonesAllowVehicles then
             local veh = GetVehiclePedIsIn(ped, false)
-            DisableControlAction(0, 71, true)  -- acelerar
-            DisableControlAction(0, 72, true)  -- frenar
-            DisableControlAction(0, 63, true)  -- girar izq
-            DisableControlAction(0, 64, true)  -- girar der
+            DisableControlAction(0, 71, true) -- acelerar
+            DisableControlAction(0, 72, true) -- frenar
+            DisableControlAction(0, 63, true) -- girar izq
+            DisableControlAction(0, 64, true) -- girar der
             SetVehicleEngineOn(veh, false, true, true)
         end
     end
@@ -473,7 +473,7 @@ AddEventHandler('horror:ghostAppearance', function()
 
     SetEntityAsMissionEntity(ghostPed, true, true)
     SetEntityInvincible(ghostPed, true)
-    SetEntityCollision(ghostPed, false, false)
+    SetEntityCollision(ghostPed, true, false)
     FreezeEntityPosition(ghostPed, false)
     SetBlockingOfNonTemporaryEvents(ghostPed, true)
     SetEntityCanBeDamaged(ghostPed, false)
@@ -942,16 +942,19 @@ AddEventHandler('horror:adminForce', function(effectType)
             end)
         end
     elseif effectType == 'ghost' then
+        if isGhostActive then
+            return
+        end
+
         if #activeEntities.ghosts >= Config.Performance.maxActiveGhosts then
-            for _, ghost in ipairs(activeEntities.ghosts) do
-                if DoesEntityExist(ghost) then
-                    DeleteEntity(ghost)
-                end
-            end
-            activeEntities.ghosts = {}
+            return
         end
 
         local playerPed = PlayerPedId()
+        if IsPedInAnyVehicle(playerPed, false) then return end
+
+        isGhostActive = true
+
         local playerCoords = GetEntityCoords(playerPed)
         local playerHeading = GetEntityHeading(playerPed)
 
@@ -964,7 +967,10 @@ AddEventHandler('horror:adminForce', function(effectType)
             timeout = timeout + 1
         end
 
-        if not HasModelLoaded(ghostModel) then return end
+        if not HasModelLoaded(ghostModel) then
+            isGhostActive = false
+            return
+        end
 
         local distance = math.random(10, 15)
         local angle = math.rad(playerHeading + math.random(-45, 45))
@@ -976,25 +982,45 @@ AddEventHandler('horror:adminForce', function(effectType)
 
         if not DoesEntityExist(ghostPed) then
             SetModelAsNoLongerNeeded(ghostModel)
+            isGhostActive = false
             return
         end
+
+        currentGhostData = {
+            ped = ghostPed,
+            startTime = GetGameTimer(),
+            isBeingRemoved = false
+        }
 
         table.insert(activeEntities.ghosts, ghostPed)
 
         SetEntityAsMissionEntity(ghostPed, true, true)
         SetEntityInvincible(ghostPed, true)
-        SetEntityCollision(ghostPed, true, true)
+        SetEntityCollision(ghostPed, true, false)
         FreezeEntityPosition(ghostPed, false)
         SetBlockingOfNonTemporaryEvents(ghostPed, true)
+        SetEntityCanBeDamaged(ghostPed, false)
+        SetPedCanRagdoll(ghostPed, false)
+        SetPedCanBeTargetted(ghostPed, false)
+        SetPedCanBeDraggedOut(ghostPed, false)
+        SetPedConfigFlag(ghostPed, 17, true)
+        SetPedConfigFlag(ghostPed, 32, false)
+        SetEntityProofs(ghostPed, true, true, true, true, true, true, true, true)
 
         Wait(500)
 
         local weapons = {
-            "WEAPON_KNIFE", "WEAPON_SWITCHBLADE", "WEAPON_MACHETE",
-            "WEAPON_BOTTLE", "WEAPON_HAMMER", "WEAPON_BAT",
-            "WEAPON_CROWBAR", "WEAPON_WRENCH"
+            "WEAPON_KNIFE",
+            "WEAPON_SWITCHBLADE",
+            "WEAPON_MACHETE",
+            "WEAPON_BOTTLE",
+            "WEAPON_HAMMER",
+            "WEAPON_BAT",
+            "WEAPON_CROWBAR",
+            "WEAPON_WRENCH",
         }
-        local weaponHash = GetHashKey(weapons[math.random(#weapons)])
+        local randomWeapon = weapons[math.random(#weapons)]
+        local weaponHash = GetHashKey(randomWeapon)
 
         GiveWeaponToPed(ghostPed, weaponHash, 1, false, true)
         SetCurrentPedWeapon(ghostPed, weaponHash, true)
@@ -1006,9 +1032,17 @@ AddEventHandler('horror:adminForce', function(effectType)
         SetPedCombatMovement(ghostPed, 2)
 
         RequestAnimDict("melee@knife@streamed_core")
-        while not HasAnimDictLoaded("melee@knife@streamed_core") do Wait(50) end
-        TaskPlayAnim(ghostPed, "melee@knife@streamed_core", "ground_attack_on_spot", 8.0, -8.0, -1, 49, 0, false, false,
-            false)
+        local animTimeout = 0
+        while not HasAnimDictLoaded("melee@knife@streamed_core") and animTimeout < 50 do
+            Wait(50)
+            animTimeout = animTimeout + 1
+        end
+
+        if HasAnimDictLoaded("melee@knife@streamed_core") then
+            TaskPlayAnim(ghostPed, "melee@knife@streamed_core", "ground_attack_on_spot", 8.0, -8.0, -1, 49, 0, false,
+                false,
+                false)
+        end
 
         PlaySoundFrontend(-1, "TIMER_STOP", "HUD_MINI_GAME_SOUNDSET", true)
 
@@ -1024,22 +1058,64 @@ AddEventHandler('horror:adminForce', function(effectType)
 
         CreateThread(function()
             local startTime = GetGameTimer()
+            local lastValidCheck = startTime
+            local stuckCheckTimer = startTime
+            local lastGhostPos = GetEntityCoords(ghostPed)
 
-            while DoesEntityExist(ghostPed) do
+            while DoesEntityExist(ghostPed) and not currentGhostData.isBeingRemoved do
                 Wait(200)
+
+                if not DoesEntityExist(ghostPed) or IsPedDeadOrDying(ghostPed, true) then
+                    RemoveGhost(ghostPed)
+                    break
+                end
 
                 local ghostPos = GetEntityCoords(ghostPed)
                 local playerPos = GetEntityCoords(PlayerPedId())
                 local dist = #(ghostPos - playerPos)
                 local elapsed = GetGameTimer() - startTime
 
+                if GetGameTimer() - stuckCheckTimer > 3000 then
+                    local movementDist = #(ghostPos - lastGhostPos)
+                    if movementDist < 1.0 and dist > 5.0 then
+                        ClearPedTasksImmediately(ghostPed)
+                        TaskGoToEntity(ghostPed, PlayerPedId(), -1, 0.0, Config.Events.ghostAppearance.chaseSpeed, 0, 0)
+                    end
+                    lastGhostPos = ghostPos
+                    stuckCheckTimer = GetGameTimer()
+                end
+
+                if GetGameTimer() - lastValidCheck > 5000 then
+                    if DoesEntityExist(ghostPed) and dist > 2.0 then
+                        ClearPedTasksImmediately(ghostPed)
+                        TaskGoToEntity(ghostPed, PlayerPedId(), -1, 0.0, Config.Events.ghostAppearance.chaseSpeed, 0, 0)
+                    end
+                    lastValidCheck = GetGameTimer()
+                end
+
                 if dist <= 2.0 then
                     DoScreenFadeOut(800)
+                    RemoveGhost(ghostPed)
                     TriggerEvent('horror:jumpscare')
                     Wait(1500)
 
-                    SetPedToRagdoll(PlayerPedId(), 3000, 3000, 0, false, false, false)
-                    RemoveGhost(ghostPed)
+                    local chance = math.random(1, 100)
+                    if chance <= 10 then
+                        ExecuteCommand('die')
+                        if Config.DebugMode then
+                            print("^1[HORROR]^7 El ghost mató al jugador (10% de probabilidad)")
+                        end
+                    else
+                        SetPedToRagdoll(PlayerPedId(), 3000, 3000, 0, false, false, false)
+                        if Config.DebugMode then
+                            print("^3[HORROR]^7 El ghost solo asustó al jugador")
+                        end
+                    end
+
+                    if DoesEntityExist(PlayerPedId()) then
+                        SetPedToRagdoll(PlayerPedId(), 3000, 3000, 0, false, false, false)
+                    end
+
                     Wait(3000)
                     DoScreenFadeIn(2000)
                     break
@@ -1049,10 +1125,17 @@ AddEventHandler('horror:adminForce', function(effectType)
                     RemoveGhost(ghostPed)
                     break
                 end
+
+                if elapsed > (Config.Events.ghostAppearance.duration + 10000) then
+                    RemoveGhost(ghostPed)
+                    break
+                end
+            end
+
+            if DoesEntityExist(ghostPed) then
+                RemoveGhost(ghostPed)
             end
         end)
-
-        SetModelAsNoLongerNeeded(ghostModel)
     elseif effectType == 'environmental' then
         local effect = GetWeightedRandom(Config.Events.environmental.effects)
 
