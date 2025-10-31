@@ -99,6 +99,13 @@ function EnterHorrorZone(zone)
 
     TriggerServerEvent('horror:playerEnterZone', zone.name)
     TriggerEvent("horror:enterZone", zone)
+    local ped = PlayerPedId()
+
+    if IsPedInAnyVehicle(ped, false) and not Config.HorrorZonesAllowVehicles then
+        local veh = GetVehiclePedIsIn(ped, false)
+        TaskLeaveVehicle(ped, veh, 4160)
+        SetVehicleEngineOn(veh, false, true, true)
+    end
 
     SetTimecycleModifier(Config.HorrorZonesTimeCycleModifier)
     SetTimecycleModifierStrength(1.0)
@@ -107,6 +114,21 @@ function EnterHorrorZone(zone)
         print(("^3[HORROR]^7 Jugador entró en: %s"):format(zone.name))
     end
 end
+
+Citizen.CreateThread(function()
+    while true do
+        Wait(0)
+        local ped = PlayerPedId()
+        if inHorrorZone and IsPedInAnyVehicle(ped, false) and not Config.HorrorZonesAllowVehicles then
+            local veh = GetVehiclePedIsIn(ped, false)
+            DisableControlAction(0, 71, true)  -- acelerar
+            DisableControlAction(0, 72, true)  -- frenar
+            DisableControlAction(0, 63, true)  -- girar izq
+            DisableControlAction(0, 64, true)  -- girar der
+            SetVehicleEngineOn(veh, false, true, true)
+        end
+    end
+end)
 
 function LeaveHorrorZone()
     inHorrorZone = false
